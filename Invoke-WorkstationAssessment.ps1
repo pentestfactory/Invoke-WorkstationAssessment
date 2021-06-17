@@ -1,3 +1,4 @@
+
 function Get-ScheduledTasks {  
     <#
     .SYNOPSIS
@@ -319,29 +320,34 @@ function Get-ScheduledTasks {
         }
     }
 }
-function Test-RegistryValue {
+Function Test-RegistryValue {
+    param(
+        [Alias("PSPath")]
+        [Parameter(Position = 0, Mandatory = $true, ValueFromPipeline = $true, ValueFromPipelineByPropertyName = $true)]
+        [String]$Path
+        ,
+        [Parameter(Position = 1, Mandatory = $true)]
+        [String]$Name
+        ,
+        [Switch]$PassThru
+    ) 
 
-    param (
-
-     [parameter(Mandatory=$true)]
-     [ValidateNotNullOrEmpty()]$Path,
-
-    [parameter(Mandatory=$true)]
-     [ValidateNotNullOrEmpty()]$Value
-    )
-
-    try {
-
-    Get-ItemProperty -Path $Path | Select-Object -ExpandProperty $Value -ErrorAction Stop | Out-Null
-     return $true
-     }
-
-    catch {
-
-    return $false
-
+    process {
+        if (Test-Path $Path) {
+            $Key = Get-Item -LiteralPath $Path
+            if ($Key.GetValue($Name, $null) -ne $null) {
+                if ($PassThru) {
+                    Get-ItemProperty $Path $Name
+                } else {
+                    $true
+                }
+            } else {
+                $false
+            }
+        } else {
+            $false
+        }
     }
-
 }
 
 function Get-ProcessInfo() {
@@ -446,6 +452,35 @@ function Out-Object {
   New-Object PSObject -Property $result | Select-Object $order
 }
 
+function Add-SecurityCheckItem {
+<#
+.SYNOPSIS
+Creates a new security check item and adds it to a global array.
+Author: Michael Ritter
+License: BSD 3-Clause
+.DESCRIPTION
+Single Security Checks that cannot be exported as CSV need to be collected centrally
+.PARAMETER SecurityItem
+Specifies the desired name for the security item group. (i.e. Microsoft PowerShell)
+.PARAMETER SecurityItemCheck
+Specifies the desired name for the specific check
+.PARAMETER AuditCheckResult
+Specifies the result of the check
+.PARAMETER AuditCheckPass
+Specifies if the security check was successful or not
+.EXAMPLE
+$result = "PowerShell v$($($PSVersionTable.PSVersion).Major) is installed and starts by default, important security features are shipped with this version" 
+Add-SecurityCheckItem -SecurityItem "PowerShell Version" -Check "Check if at least PowerShell version 5 is in use" -AuditCheckResult $result -AuditCheckPass $true
+
+#>
+    param (
+        [String] $strSecurityItem
+    )
+    SecurityItem    = $SecurityItem
+    Check     = $strSecurityItemCheck                
+    Result      = $strAuditCheckResult
+    Passed = $booAuditCheckPass
+}
 # Translates a SID in the form *S-1-5-... to its account name;
 function Get-AccountName {
   param(
@@ -695,21 +730,211 @@ function Test-SysmonInstalled {
     }
 }
 
+Function Add-ResultEntry {
 
+    <#
+    .SYNOPSIS
+        The result of the test is saved in a CSV file with the retrieved
+        value, the severity level and the recommended value.
+    #>
+
+    [CmdletBinding()]
+    Param (
+        
+        [String]
+        $Text
+    )
+
+    try {
+        Add-Content -Path $ReportFile -Value $Text -ErrorAction Stop
+    } catch {
+        Write-ProtocolEntry -Text "Error while writing the result into $ReportFile. Aborting..." -LogLevel "Error"
+        Break            
+    }
+}
+
+function Get-SecurityAuditPolicyDE
+{
+    [CmdletBinding()]
+    param ()
+
+    # Use the helper functions to execute the auditpol.exe queries.
+    $csvAuditCategories = Invoke-AuditPolListSubcategoryAllCsv | ConvertFrom-Csv
+    $csvAuditSettings   = Invoke-AuditPolGetCategoryAllCsv | ConvertFrom-Csv
+
+    foreach ($csvAuditCategory in $csvAuditCategories)
+    {
+        # If the Category/Subcategory field starts with two blanks, it is a
+        # subcategory entry - else a category entry.
+        if ($csvAuditCategory.'GUID' -like '{*-797A-11D9-BED3-505054503030}')
+        {
+            $lastCategory     = $csvAuditCategory.'Kategorie/Unterkategorie'
+            $lastCategoryGuid = $csvAuditCategory.GUID
+        }
+        else
+        {
+            $csvAuditSetting = $csvAuditSettings | Where-Object { $_.'Unterkategorie-GUID' -eq $csvAuditCategory.GUID }
+
+            
+            #Write-Host "DE"
+            # Return the result object
+            [PSCustomObject] @{
+                PSTypeName      = 'SecurityFever.AuditPolicy'
+                ComputerName    = $csvAuditSetting.'Computername'
+                Category        = $lastCategory
+                CategoryGuid    = $lastCategoryGuid
+                Subcategory     = $csvAuditSetting.'Unterkategorie'
+                SubcategoryGuid = $csvAuditSetting.'Unterkategorie-GUID'
+                AuditSuccess    = $csvAuditSetting.'Aufnahmeeinstellung' -like '*Erfolg*'
+                AuditFailure    = $csvAuditSetting.'Aufnahmeeinstellung' -like '*Fehler*'
+            }
+        }
+            
+    }
+    
+}
+
+function Get-SecurityAuditPolicy
+{
+    [CmdletBinding()]
+    param ()
+
+    # Use the helper functions to execute the auditpol.exe queries.
+    $csvAuditCategories = Invoke-AuditPolListSubcategoryAllCsv | ConvertFrom-Csv
+    $csvAuditSettings   = Invoke-AuditPolGetCategoryAllCsv | ConvertFrom-Csv
+
+    foreach ($csvAuditCategory in $csvAuditCategories)
+    {
+        # If the Category/Subcategory field starts with two blanks, it is a
+        # subcategory entry - else a category entry.
+        if ($csvAuditCategory.'GUID' -like '{*-797A-11D9-BED3-505054503030}')
+        {
+            $lastCategory     = $csvAuditCategory.'Category/Subcategory'
+            $lastCategoryGuid = $csvAuditCategory.GUID
+        }
+        else
+        {
+            $csvAuditSetting = $csvAuditSettings | Where-Object { $_.'Subcategory GUID' -eq $csvAuditCategory.GUID }
+
+            # Return the result object
+            [PSCustomObject] @{
+                PSTypeName      = 'SecurityFever.AuditPolicy'
+                ComputerName    = $csvAuditSetting.'Machine Name'
+                Category        = $lastCategory
+                CategoryGuid    = $lastCategoryGuid
+                Subcategory     = $csvAuditSetting.'Subcategory'
+                SubcategoryGuid = $csvAuditSetting.'Subcategory GUID'
+                AuditSuccess    = $csvAuditSetting.'Inclusion Setting' -like '*Success*'
+                AuditFailure    = $csvAuditSetting.'Inclusion Setting' -like '*Failure*'
+            }
+        }
+    }
+}
+
+function Invoke-AuditPolGetCategoryAllCsv
+{
+    [CmdletBinding()]
+    param ()
+
+    (auditpol.exe /get /category:* /r) |
+        Where-Object { -not [String]::IsNullOrEmpty($_) }
+}
+
+function Invoke-AuditPolListSubcategoryAllCsv
+{
+    [CmdletBinding()]
+    param ()
+
+    (auditpol.exe /list /subcategory:* /r) |
+        Where-Object { -not [String]::IsNullOrEmpty($_) }
+}
+function Add-SecurityCheckItem {
+    <#
+    .SYNOPSIS
+    Creates a new security check item and adds it to a global array.
+    Author: Michael Ritter
+    License: BSD 3-Clause
+    .DESCRIPTION
+    Single Security Checks that cannot be exported as CSV need to be collected centrally
+    .PARAMETER SecurityItem
+    Specifies the desired name for the security item group. (i.e. Microsoft PowerShell)
+    .PARAMETER SecurityItemCheck
+    Specifies the desired name for the specific check
+    .PARAMETER AuditCheckResult
+    Specifies the result of the check
+    .PARAMETER AuditCheckPass
+    Specifies if the security check was successful or not
+    .EXAMPLE
+    $result = "PowerShell v$($($PSVersionTable.PSVersion).Major) is installed and starts by default, important security features are shipped with this version" 
+    Add-SecurityCheckItem -SecurityItem "PowerShell Version" -SecurityItemCheck "Check if at least PowerShell version 5 is in use" -AuditCheckResult $result -AuditCheckPass $true
+    
+    #>
+    param (
+        [Parameter(Position = 0, Mandatory=$True)]
+        [String] $SecurityItem,
+        [Parameter(Position = 1, Mandatory=$True)]
+        [String] $SecurityItemCheck,
+        [Parameter(Position = 2, Mandatory=$True)]
+        [String] $AuditCheckResult,
+        [Parameter(Position = 3, Mandatory=$True)]
+        [Bool] $AuditCheckPass
+    )
+        $SecurityItemAuditResults = @()
+        $auditDetails = @{
+            SecurityItem    = $SecurityItem
+            Check     = $SecurityItemCheck
+            Result      = $AuditCheckResult
+            Passed = $AuditCheckPass
+        } 
+    
+       $Global:SecurityItemAuditResults += New-Object PSObject -Property $auditDetails
+    }
+    
+$path = ".\CSV"
+If(!(test-path $path))
+{
+      New-Item -ItemType Directory -Force -Path $path
+}
+
+# Settings CSV
+$SecurityItemAuditResults = @()
 
 Write-Host '#########################' -BackgroundColor Black
 Write-Host '## PowerShell Version  ##' -BackgroundColor Black
 Write-Host '#########################' -BackgroundColor Black
-Write-Host 'Checking the version used by default' -ForegroundColor Black -BackgroundColor White
-Write-Host ' '
-$PSVersionTable.PSVersion
-Write-Host ' '
-Write-Host ' '
-Write-Host 'Checking if PowerShellv2 is installed' -ForegroundColor Black -BackgroundColor White
-Get-WindowsOptionalFeature -Online | Where-Object {$_.FeatureName -match "PowerShellv2"}
-Write-Host ' '
-Write-Host ' '
+$strSecurityItem = "PowerShell Version"
+$strSecurityItemCheck = "PowerShell version should be at least 5"
 
+Write-Host 'Checking the version used by default' -ForegroundColor Black -BackgroundColor White
+
+if(($PSVersionTable.PSVersion).Major -ge 5){
+    $strAuditCheckResult="PowerShell v$($($PSVersionTable.PSVersion).Major) is installed and starts by default, important security features are shipped with this version"
+    Write-Host $strAuditCheckResult -ForegroundColor Green
+    Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+} else {
+    $strAuditCheckResult="PowerShell v$($($PSVersionTable.PSVersion).Major) is installed and starts by default, important security features are missing in this version"
+    Write-Host $strAuditCheckResult -ForegroundColor Red
+    Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+}
+
+
+$strSecurityItem = "PowerShell Version"
+$strSecurityItemCheck = "PowerShell version 2 should be disabled"
+Write-Host 'Checking if PowerShellv2 is installed' -ForegroundColor Black -BackgroundColor White
+
+if(((Get-WindowsOptionalFeature -Online | Where-Object {$_.FeatureName -match "PowerShellv2"}).State) -eq "Enabled"){
+    $strAuditCheckResult='PowerShell v2 is still enabled'
+    Write-Host $strAuditCheckResult -ForegroundColor Red
+    Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+} else {
+    $strAuditCheckResult='PowerShell v2 is disabled'
+    Write-Host $strAuditCheckResult -ForegroundColor Green
+    Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+}
+
+
+$strSecurityItem = "PowerShell - Module Logging"
+$strSecurityItemCheck = "PowerShell Module Logging should be enabled"
 Write-Host '####################' -BackgroundColor Black
 Write-Host '## Module Logging ##' -BackgroundColor Black
 Write-Host '####################' -BackgroundColor Black
@@ -717,44 +942,38 @@ Write-Host 'Checking if PowerShell Module Logging is enabled' -ForegroundColor B
 $regPath = "HKLM:\SOFTWARE\Wow6432Node\Policies\Microsoft\Windows\PowerShell\ModuleLogging"
 $regPathProperty = "EnableModuleLogging"
 
-
 if(Test-Path -Path $regPath)
 {
     $check = Get-ItemProperty -Path $regPath | Select-Object -ExpandProperty $regPathProperty -ErrorAction silentlycontinue
-
+    
     Switch($check)
     {
          '1' 
          {
-             Write-Host 'Module Logging is enabled' -ForegroundColor Green
-             Write-Host ' '
-             Write-Host 'The following module names will be logged' -ForegroundColor Black -BackgroundColor White
-             Write-Host ' '
-             Get-ChildItem -Path "HKLM:\SOFTWARE\Wow6432Node\Policies\Microsoft\Windows\PowerShell\ModuleLogging\" | Format-Table Property
-             Write-Host ' '
-             Write-Host ' '
-             Write-Host ' '
+            $strAuditCheckResult='Module Logging is enabled'
+            Write-Host $strAuditCheckResult -ForegroundColor Green
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+            Write-Host 'The following module names will be logged' -ForegroundColor Black -BackgroundColor White          
+            Get-ChildItem -Path "HKLM:\SOFTWARE\Wow6432Node\Policies\Microsoft\Windows\PowerShell\ModuleLogging\" | Format-Table Property
 
          }
          '0' 
          {
-             Write-Host 'Module Logging is disabled - Explicitly deactivated' -ForegroundColor Red
-             Write-Host ' '
-             Write-Host ' '
-             Write-Host ' '
+             $strAuditCheckResult='Module Logging is disabled'
+             Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+             Write-Host $strAuditCheckResult -ForegroundColor Red
          }
      }
 }
 else{
-         Write-Host 'Module Logging is disabled - Not configured (Default)' -ForegroundColor Red
-         Write-Host ' '
-         Write-Host ' '
-         Write-Host ' '
+         $strAuditCheckResult='Module Logging is disabled'
+         Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+         Write-Host $strAuditCheckResult -ForegroundColor Red    
 }
 
 
-
-
+$strSecurityItem = "PowerShell - Script Block Logging"
+$strSecurityItemCheck = "PowerShell Script Block Logging should be enabled"
 Write-Host '##########################' -BackgroundColor Black
 Write-Host '## Script Block Logging ##' -BackgroundColor Black
 Write-Host '##########################' -BackgroundColor Black
@@ -770,30 +989,27 @@ if(Test-Path -Path $regPath)
     {
          '1' 
          {
-             Write-Host 'Script Block Logging is enabled' -ForegroundColor Green
-             Write-Host ' '
-             Write-Host ' '
-             Write-Host ' '
-
+            $strAuditCheckResult='Script Block Logging is enabled'
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+            Write-Host $strAuditCheckResult -ForegroundColor Green
          }
          '0' 
          {
-             Write-Host 'Script Block Logging is disabled - Explicitly deactivated' -ForegroundColor Red
-             Write-Host ' '
-             Write-Host ' '
-             Write-Host ' '
+            $strAuditCheckResult='Script Block Logging is disabled'
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+            Write-Host $strAuditCheckResult -ForegroundColor Red
          }
      }
 }
 else{
-         Write-Host 'Script Block Logging is disabled - Not configured (Default)' -ForegroundColor Red
-         Write-Host ' '
-         Write-Host ' '
-         Write-Host ' '
+        $strAuditCheckResult='Script Block Logging is disabled'
+        Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+        Write-Host $strAuditCheckResult -ForegroundColor Red
 }
 
 
-
+$strSecurityItem = "PowerShell - Transcript Logging"
+$strSecurityItemCheck = "PowerShell Transcript Logging should be enabled"
 Write-Host '#########################' -BackgroundColor Black
 Write-Host '## Transcript Logging  ##' -BackgroundColor Black
 Write-Host '#########################' -BackgroundColor Black
@@ -810,55 +1026,71 @@ if(Test-Path -Path $regPath)
          '1' 
          {
              ## Enabled
-             Write-Host 'Transcript Logging is enabled' -ForegroundColor Green
-             Write-Host ' '
-             Write-Host ' '
+             $strAuditCheckResult='Transcript Logging is enabled'
+             Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+             Write-Host $strAuditCheckResult -ForegroundColor Green
 
              ## Check Invocation Header
-             if((Test-RegistryValue -Path $regPath -Value EnableInvocationHeader)){
-                Write-Host 'Invocation Header is set' -ForegroundColor Green
-                 ' '
+             $strSecurityItemCheck = "PowerShell Transcript Logging - Invocation Header should be set"
+             $regPathProperty = "EnableInvocationHeader"
+             if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
+                
+                $strAuditCheckResult='Invocation Header is set '
+                Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+                Write-Host $strAuditCheckResult -ForegroundColor Green
+
              } else {
-                Write-Host 'Invocation Header is not set' -ForegroundColor Red
-                ' '
+
+                $strAuditCheckResult='Invocation Header is not set '
+                Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+                Write-Host $strAuditCheckResult -ForegroundColor Red
+
              }
 
              ## Output Directory
-             if((Test-RegistryValue -Path $regPath -Value OutputDirectory)) {
-                ' '
+             $strSecurityItemCheck = "PowerShell Transcript Logging - An output directory should be set"
+             $regPathProperty = "OutputDirectory"
+             if((Test-RegistryValue -Path $regPath -Name $regPathProperty)) {
+                
                 'Output Directory is set to:'
                 $outputDirectory=(Get-ItemProperty -Path "HKLM:\SOFTWARE\Wow6432Node\Policies\Microsoft\Windows\PowerShell\Transcription\" -Name "OutputDirectory").OutputDirectory
                 if(([string]::IsNullOrEmpty($outputDirectory))){
-                    Write-Host '(Default) Windows PowerShell will record transcript output to each users My Documents directory' -ForegroundColor Yellow
-                    Write-Host ' '
+                    $strAuditCheckResult='(Default) Windows PowerShell will record transcript output to each users My Documents directory '
+                    Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+                    Write-Host $strAuditCheckResult -ForegroundColor Yellow
+                    
                 } else {
-                    Write-Host $outputDirectory
-                     Write-Host ' '
+                    $strAuditCheckResult="Output Directory: $($outputDirectory)"
+                    Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+                    Write-Host $strAuditCheckResult -ForegroundColor Green
                 }
 
              } else {
-                Write-Host 'Output Directory is not set' -ForegroundColor Red
+                $strAuditCheckResult='Output Directory is not set'
+                Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+                Write-Host $strAuditCheckResult -ForegroundColor Red
              }
 
          }
          '0' 
          {
-             Write-Host 'Transcript Logging is disabled - Explicitly deactivated' -fore
-             Write-Host ' '
-             Write-Host ' '
-             Write-Host ' '
+            $strSecurityItemCheck = "PowerShell Transcript Logging should be enabled"
+            $strAuditCheckResult='Transcript Logging is disabled '
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+            Write-Host $strAuditCheckResult -ForegroundColor Red
          }
      }
 }
 else
 {
-         Write-Host 'Transcript Logging is disabled - Not configured (Default)' -ForegroundColor Red
-         Write-Host ' '
-         Write-Host ' '
-         Write-Host ' '
+         $strAuditCheckResult='Transcript Logging is disabled '
+         Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+         Write-Host $strAuditCheckResult -ForegroundColor Red
 }
 
 
+$strSecurityItem = "PowerShell - Language Mode"
+$strSecurityItemCheck = "PowerShell Constrained Language Mode should be active"
 Write-Host '#########################' -BackgroundColor Black
 Write-Host '##    Language Mode    ##' -BackgroundColor Black
 Write-Host '#########################' -BackgroundColor Black
@@ -867,30 +1099,30 @@ Switch($ExecutionContext.SessionState.LanguageMode)
 {
         'FullLanguage' 
         {
-            Write-Host 'Constrained Language Mode is not active' -ForegroundColor Red
-            Write-Host ' '
-            Write-Host ' '
-            Write-Host ' '
-
+            $strAuditCheckResult='Constrained Language Mode is not active'
+            Write-Host  $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
         }
         'ConstrainedLanguage' 
         {
-            Write-Host 'Constrained Language Mode is active' -ForegroundColor Green
-            Write-Host ' '
-            Write-Host ' '
-            Write-Host ' '
+            $strAuditCheckResult = 'Constrained Language Mode is active'
+            Write-Host $strAuditCheckResult -ForegroundColor Green
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
         }
     }
 
+
+$strSecurityItem = "Logging - Sysmon" # TODO
+$strSecurityItemCheck = "Sysmon should be installed and configured"
 Write-Host '#########################' -BackgroundColor Black
 Write-Host '##       Sysmon        ##' -BackgroundColor Black
 Write-Host '#########################' -BackgroundColor Black
 Write-Host 'Checking if Sysmon is installed' -ForegroundColor Black -BackgroundColor White
 Test-SysmonInstalled
-Write-Host ' '
-Write-Host ' '
-Write-Host ' '
 
+
+$strSecurityItem = "Credential Theft - LSA Protection"
+$strSecurityItemCheck = "LSA Protection should be enabled"
 Write-Host '#########################' -BackgroundColor Black
 Write-Host '##    LSA Protection   ##' -BackgroundColor Black
 Write-Host '#########################' -BackgroundColor Black
@@ -899,33 +1131,67 @@ Write-Host 'Checking if LSA Protection is enabled' -ForegroundColor Black -Backg
 $regPath = "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa"
 $regPathProperty = "RunAsPPL"
 
-if((Test-RegistryValue -Path $regPath -Value $regPathProperty)){
+if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
     $check = Get-ItemProperty -Path $regPath | Select-Object -ExpandProperty $regPathProperty -ErrorAction silentlycontinue
     Switch($check)
     {
          '1' 
          {
-             Write-Host 'LSA Protection is enabled' -ForegroundColor Green
-             Write-Host ' '
-             Write-Host ' '
-             Write-Host ' '
+            $strAuditCheckResult='LSA Protection is enabled'
+            Write-Host  $strAuditCheckResult -ForegroundColor Green
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
 
          }
          '0' 
          {
-             Write-Host 'LSA Protection is explicitly disabled' -ForegroundColor Red
-             Write-Host ' '
-             Write-Host ' '
-             Write-Host ' '
+            $strAuditCheckResult='LSA Protection is disabled'
+            Write-Host $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
          }
      }
  } else {
-    Write-Host 'LSA Protection is not enabled' -ForegroundColor Red
-    ' '
+        $strAuditCheckResult='LSA Protection is disabled'
+        Write-Host $strAuditCheckResult -ForegroundColor Red
+        Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+ }
+
+ 
+$strSecurityItem = "Credential Theft - LM Hashes"
+$strSecurityItemCheck = "Storing LM Hashes should be prevented"
+Write-Host '#########################' -BackgroundColor Black
+Write-Host '##      LM Hashes      ##' -BackgroundColor Black
+Write-Host '#########################' -BackgroundColor Black
+Write-Host 'Checking if LM Hashes can be stored' -ForegroundColor Black -BackgroundColor White
+$regPath = "HKLM:\\\SYSTEM\CurrentControlSet\Control\Lsa\"
+$regPathProperty = "NoLMHash"
+
+if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
+    $check = Get-ItemProperty -Path $regPath | Select-Object -ExpandProperty $regPathProperty -ErrorAction silentlycontinue
+    Switch($check)
+    {
+         '1' 
+         {
+            $strAuditCheckResult='LM Hashes are not stored'
+            Write-Host $strAuditCheckResult -ForegroundColor Green
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+         }
+         '0' 
+         {
+            $strAuditCheckResult='LM Hashes are stored'
+            Write-Host $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+         }
+     }
+ } else {
+    $strAuditCheckResult='LM Hashes are stored'
+    Write-Host $strAuditCheckResult -ForegroundColor Red
+    Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
  }
 
 ## WDIGEST
 # https://www.praetorian.com/blog/mitigating-mimikatz-wdigest-cleartext-credential-theft/
+$strSecurityItem = "Credential Theft - WDigest"
+$strSecurityItemCheck = "WDigest should be disabled"
 Write-Host '#########################' -BackgroundColor Black
 Write-Host '##        WDigest      ##' -BackgroundColor Black
 Write-Host '#########################' -BackgroundColor Black
@@ -933,29 +1199,27 @@ Write-Host 'Checking if WDigest is enabled' -ForegroundColor Black -BackgroundCo
 $regPath = "HKLM:\\SYSTEM\CurrentControlSet\Control\SecurityProviders\WDigest"
 $regPathProperty = "UseLogonCredential"
 
-if((Test-RegistryValue -Path $regPath -Value $regPathProperty)){
+if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
     $check = Get-ItemProperty -Path $regPath | Select-Object -ExpandProperty $regPathProperty -ErrorAction silentlycontinue
     Switch($check)
     {
          '1' 
          {
-             Write-Host 'WDigest is enabled' -ForegroundColor Red
-             Write-Host ' '
-             Write-Host ' '
-             Write-Host ' '
-
+            $strAuditCheckResult='WDigest is enabled'
+            Write-Host $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
          }
          '0' 
          {
-             Write-Host 'WDigest is not enabled' -ForegroundColor Green
-             Write-Host ' '
-             Write-Host ' '
-             Write-Host ' '
+            $strAuditCheckResult='WDigest is disabled'
+            Write-Host $strAuditCheckResult -ForegroundColor Green
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
          }
      }
  } else {
-    Write-Host 'WDigest is not enabled' -ForegroundColor Green
-    ' '
+    $strAuditCheckResult='WDigest is disabled'
+    Write-Host $strAuditCheckResult -ForegroundColor Green
+    Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
  }
 
 
@@ -973,7 +1237,8 @@ Get-AppLockerPolicy -Effective -Xml | Set-Content ('.\applocker.xml')
 #PS C:\> Get-ChildItem -Path HKLM:Software\Policies\Microsoft\Windows\SrpV2 -Recurse
 #PS C:\> Get-AppLockerPolicy -Domain -LDAP "LDAP:// DC13.Contoso.com/CN={31B2F340-016D-11D2-945F-00C04FB984F9},CN=Policies,CN=System,DC=Contoso,DC=com
 
-
+$strSecurityItem = "Credential Theft - Device Guard" # TODO
+$strSecurityItemCheck = "Device Guard should be enabled and configured"
 Write-Host '#########################' -BackgroundColor Black
 Write-Host '##     Device Guard    ##' -BackgroundColor Black
 Write-Host '#########################' -BackgroundColor Black
@@ -984,7 +1249,8 @@ $SecurityProps = Get-CSDeviceGuardStatus
 $SecurityProps.AvailableSecurityProperties
 
 
-
+$strSecurityItem = "Credential Theft - Credential Guard"
+$strSecurityItemCheck = "Credential Guard should be enabled and running"
 Write-Host '###########################' -BackgroundColor Black
 Write-Host '##   Credential Guard    ##' -BackgroundColor Black
 Write-Host '###########################' -BackgroundColor Black
@@ -997,31 +1263,69 @@ Switch($check)
 {
         $true 
         {
-            Write-Host 'Credential Guard is running' -ForegroundColor Green
-            Write-Host ' '
-            Write-Host ' '
-            Write-Host ' '
+            $strAuditCheckResult='Credential Guard is running'
+            Write-Host $strAuditCheckResult -ForegroundColor Green
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
 
         }
         $false 
         {
-            Write-Host 'Credential Guard is not running' -ForegroundColor Red
-            Write-Host ' '
-            Write-Host ' '
-            Write-Host ' '
+            $strAuditCheckResult='Credential Guard is not running'
+            Write-Host $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
         }
     }
 
+$strSecurityItem = "Windows Firewall - Private Profile"
+$strSecurityItemCheck = "Private Profile - Firewall should be enabled"
 Write-Host '#########################' -BackgroundColor Black
 Write-Host '##   Windows Firewall  ##' -BackgroundColor Black
 Write-Host '#########################' -BackgroundColor Black
 Write-Host 'Checking Firewall State' -ForegroundColor Black -BackgroundColor White
 $regkey = "HKLM:\System\ControlSet001\Services\SharedAccess\Parameters\FirewallPolicy"
-New-Object -TypeName PSobject -Property @{
-    Standard    = If ((Get-ItemProperty $regkey\StandardProfile).EnableFirewall -eq 1){"Enabled"}Else {"Disabled"}
-    Domain      = If ((Get-ItemProperty $regkey\DomainProfile).EnableFirewall -eq 1){"Enabled"}Else {"Disabled"}
-    Public      = If ((Get-ItemProperty $regkey\PublicProfile).EnableFirewall -eq 1){"Enabled"}Else {"Disabled"}
-} | Format-Table
+
+If ((Get-ItemProperty $regkey\StandardProfile).EnableFirewall -eq 1){
+    $strSecurityItem = "Windows Firewall - Private Profile"
+    $strSecurityItemCheck = "Private Profile - Firewall should be enabled"
+    $strAuditCheckResult='Private Profile - Firewall is enabled'
+    Write-Host $strAuditCheckResult -ForegroundColor Green
+    Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+}Else {
+    $strSecurityItem = "Windows Firewall - Private Profile"
+    $strSecurityItemCheck = "Private Profile - Firewall should be enabled"
+    $strAuditCheckResult='Private Profile - Firewall is disabled'
+    Write-Host $strAuditCheckResult -ForegroundColor Red
+    Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+}
+
+If ((Get-ItemProperty $regkey\DomainProfile).EnableFirewall -eq 1){
+    $strSecurityItem = "Windows Firewall - Domain Profile"
+    $strSecurityItemCheck = "Domain Profile - Firewall should be enabled"
+    $strAuditCheckResult='Domain Profile - Firewall is enabled'
+    Write-Host $strAuditCheckResult -ForegroundColor Green
+    Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+}Else {
+    $strSecurityItem = "Windows Firewall - Domain Profile"
+    $strSecurityItemCheck = "Domain Profile - Firewall should be enabled"
+    $strAuditCheckResult='Domain Profile - Firewall is disabled'
+    Write-Host $strAuditCheckResult -ForegroundColor Red
+    Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+}
+
+If ((Get-ItemProperty $regkey\PublicProfile).EnableFirewall -eq 1){
+    $strSecurityItem = "Windows Firewall - Public Profile"
+    $strSecurityItemCheck = "Public Profile - Firewall should be enabled"
+    $strAuditCheckResult='Public Profile - Firewall is enabled'
+    Write-Host $strAuditCheckResult -ForegroundColor Green
+    Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+}Else {
+    $strSecurityItem = "Windows Firewall - Public Profile"
+    $strSecurityItemCheck = "Public Profile - Firewall should be enabled"
+    $strAuditCheckResult='Public Profile - Firewall is disabled'
+    Write-Host $strAuditCheckResult -ForegroundColor Red
+    Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+}
+
 Write-Host 'Exporting Windows Firewall Rules to CSV-file'
 Get-NetFirewallRule | Select-Object -Property Name, DisplayName, DisplayGroup, 
 @{Name='Protocol';Expression={($PSItem | Get-NetFirewallPortFilter).Protocol}},
@@ -1030,7 +1334,8 @@ Get-NetFirewallRule | Select-Object -Property Name, DisplayName, DisplayGroup,
 @{Name='RemoteAddress';Expression={($PSItem | Get-NetFirewallAddressFilter).RemoteAddress}}, Enabled, Profile, Direction, Action | 
 Export-Csv -Path ".\CSV\Windows Firewall Rules.csv" -NoTypeInformation 
 
-
+$strSecurityItem = "DNS Spoofing - LLMNR"
+$strSecurityItemCheck = "LLMNR should be disabled"
 Write-Host '#########################' -BackgroundColor Black
 Write-Host '##        LLMNR        ##' -BackgroundColor Black
 Write-Host '#########################' -BackgroundColor Black
@@ -1038,45 +1343,47 @@ Write-Host 'Check if LLMNR is enabled' -ForegroundColor Black -BackgroundColor W
 $regPath = "HKLM:\\Software\Policies\Microsoft\Windows NT\DNSClient"
 $regPathProperty = "EnableMulticast"
 
-if((Test-RegistryValue -Path $regPath -Value $regPathProperty)){
+if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
     $check = Get-ItemProperty -Path $regPath | Select-Object -ExpandProperty $regPathProperty -ErrorAction silentlycontinue
     Switch($check)
     {
          '1' 
          {
-             Write-Host 'LLMNR is enabled' -ForegroundColor Red
-             Write-Host ' '
-             Write-Host ' '
-             Write-Host ' '
-
+            $strAuditCheckResult='LLMNR is enabled'
+            Write-Host $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
          }
          '0' 
          {
-             Write-Host 'LLMNR is disabled' -ForegroundColor Green
-             Write-Host ' '
-             Write-Host ' '
-             Write-Host ' '
+            $strAuditCheckResult='LLMNR is disabled'
+            Write-Host $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
          }
      }
  } else {
-    Write-Host 'LLMNR is disabled' -ForegroundColor Green
-    ' '
+    $strAuditCheckResult='LLMNR is disabled'
+    Write-Host $strAuditCheckResult -ForegroundColor Red
+    Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
  }
 
+ $strSecurityItem = "DNS Spoofing - NBNS" #ToDo
+ $strSecurityItemCheck = "NBNS should be disabled"
 Write-Host '#########################' -BackgroundColor Black
 Write-Host '##        NBNS         ##' -BackgroundColor Black
 Write-Host '#########################' -BackgroundColor Black
 Write-Host 'Check if NBNS is enabled' -ForegroundColor Black -BackgroundColor White
 $regPath="HKLM:SYSTEM\CurrentControlSet\services\NetBT\Parameters\Interfaces"
-Get-ChildItem $regPath | foreach { get-ItemProperty -Path "$regPath\$($_.pschildname)" -Name NetbiosOptions} | Format-Table NetBiosOptions,@{Name='Interf
-ace';Expression={$_.PSChildname}}
+
+Get-ChildItem $regPath | ForEach-Object { 
+    get-ItemProperty -Path "$regPath\$($_.pschildname)" -Name NetbiosOptions} | Format-Table NetBiosOptions,@{Name='Interface';Expression={$_.PSChildname}
+}
 
 Write-Host '0 - Configuration via DHCP' -ForegroundColor Red
 Write-Host '1 - Specifies that NetBIOS is enabled.' -ForegroundColor Red
 Write-Host '2 - NetBIOS is disabled' -ForegroundColor Green
-Write-Host ' '
-Write-Host ' '
-Write-Host ' '
+
+
+
 # Mitigation:
 # $regkey = "HKLM:SYSTEM\CurrentControlSet\services\NetBT\Parameters\Interfaces"
 # Get-ChildItem $regkey |foreach { Set-ItemProperty -Path "$regkey\$($_.pschildname)" -Name NetbiosOptions -Value 2 -Verbose}
@@ -1084,33 +1391,149 @@ Write-Host ' '
 
 # Windows Defender
 # https://www.windowscentral.com/how-manage-microsoft-defender-antivirus-powershell-windows-10
+$strSecurityItem = "Malware Protection - AV" #ToDo
+$strSecurityItemCheck = "An AV solution should be installed and active"
 Write-Host '#########################' -BackgroundColor Black
 Write-Host '#    Windows Defender  ##' -BackgroundColor Black
 Write-Host '#########################' -BackgroundColor Black
 $defenderPreferences = Get-MpPreference
 
 if(($defenderDetails.RealTimeProtectionEnabled)){
-    Write-Host 'Defender is active' -ForegroundColor Green
-    ' '
-    ' '
+    $strAuditCheckResult='Defender is active'
+    Write-Host $strAuditCheckResult -ForegroundColor Green
+    Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
  } else {
-    Write-Host 'Defender is not active' -ForegroundColor Red
-    Write-Host ' '
-    Write-Host ' '
+    $strAuditCheckResult='Defender is not active'
+    Write-Host $strAuditCheckResult -ForegroundColor Green
+    Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
  }
 
+ $strSecurityItem = "Malware Protection - Hardening" #ToDo
+ $strSecurityItemCheck = "Windows Installer Always install with elevated privileges"
+ Write-Host '#################################' -BackgroundColor Black
+ Write-Host '##      Windows Installer      ##' -BackgroundColor Black
+ Write-Host '#################################' -BackgroundColor Black
+ Write-Host 'Checking if Windows installer allows elevated privileges to standard users' -ForegroundColor Black -BackgroundColor White
+ $regPath = "HKLM:\\SOFTWARE\Policies\Microsoft\Windows\Installer\"
+ $regPathProperty = "AlwaysInstallElevated"
+ 
+ if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
+     $check = Get-ItemProperty -Path $regPath | Select-Object -ExpandProperty $regPathProperty -ErrorAction silentlycontinue
+     Switch($check)
+     {
+          '1' 
+          {
+            $strAuditCheckResult='Windows installer allows elevated privileges to standard users - AlwaysInstallElevated is enabled'
+            Write-Host $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+          }
+          '0' 
+          {
+            $strAuditCheckResult='Windows installer denies elevated privileges to standard users - AlwaysInstallElevated is disabled'
+            Write-Host $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+          }
+      }
+  } else {
+    $strAuditCheckResult='Windows installer denies elevated privileges to standard users - AlwaysInstallElevated is disabled'
+    Write-Host $strAuditCheckResult -ForegroundColor Red
+    Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+  }
 
 Write-Host '##########################' -BackgroundColor Black
 Write-Host '##  Installed Software  ##' -BackgroundColor Black
 Write-Host '##########################' -BackgroundColor Black
 Write-Host 'Getting a list of installed Software:' -ForegroundColor Black -BackgroundColor White
 Get-WMIObject -Query "SELECT * FROM Win32_Product" | Select-Object Name,Version,Vendor,InstallLocation,InstallDate | format-table
-Write-Host ' '
-Write-Host ' '
+
+
 Write-Host 'Exporting installed software to CSV-File'
 Get-WMIObject -Query "SELECT * FROM Win32_Product" | Select-Object Name,Version,Vendor,InstallLocation,InstallDate | Export-Csv -Path ".\CSV\Installed Software.csv" -NoTypeInformation 
 
+Write-Host 'Getting a list of installed Software:' -ForegroundColor Black -BackgroundColor White
+Get-WindowsOptionalFeature -Online | where-object {$_.State -eq "Enabled"} | Sort-Object FeatureName| Format-Table *
+Get-WindowsOptionalFeature -Online | where-object {$_.State -eq "Enabled"} | Sort-Object FeatureName| Export-Csv -Path ".\CSV\Windows Features.csv" -NoTypeInformation 
 
+Write-Host 'Getting a list of installed updates:' -ForegroundColor Black -BackgroundColor White
+get-wmiobject -class win32_quickfixengineering | Sort-Object installedOn | Export-Csv -Path ".\CSV\Windows Updates.csv" -NoTypeInformation
+
+$strSecurityItem = "Malware Protection - Windows Update" #ToDo
+$strSecurityItemCheck = "Auto Update should be enabled"
+Write-Host '#################################' -BackgroundColor Black
+Write-Host '##      Windows Updates      ##' -BackgroundColor Black
+Write-Host '#################################' -BackgroundColor Black
+Write-Host 'Checking if Automatic Updates are enabled' -ForegroundColor Black -BackgroundColor White
+$regPath = "HKLM:\\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\Au\"
+$regPathProperty = "NoAutoUpdate"
+
+if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
+    $check = Get-ItemProperty -Path $regPath | Select-Object -ExpandProperty $regPathProperty -ErrorAction silentlycontinue
+    Switch($check)
+    {
+         '1' 
+         {
+           $strAuditCheckResult='Automatic Updates are disabled'
+           Write-Host $strAuditCheckResult -ForegroundColor Red
+           Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+           $booAutoUpdate=$false
+         }
+         '0' 
+         {
+           $strAuditCheckResult='Automatic Updates are enabled'
+           Write-Host $strAuditCheckResult -ForegroundColor Green
+           Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+           $booAutoUpdate=$true
+         }
+     }
+ } else {
+    $strAuditCheckResult='Automatic Updates are enabled'
+    Write-Host $strAuditCheckResult -ForegroundColor Green
+    Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+    $booAutoUpdate=$true
+ }
+
+ if($booAutoUpdate){
+    $strSecurityItemCheck = "Auto Update configuration"
+    Write-Host 'Checking if Automatic Update configuration' -ForegroundColor Black -BackgroundColor White
+    $regPath = "HKLM:\\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\Au\"
+    $regPathProperty = "AUOptions"
+
+    if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
+        $check = Get-ItemProperty -Path $regPath | Select-Object -ExpandProperty $regPathProperty -ErrorAction silentlycontinue
+        Switch($check)
+        {
+             '1' 
+             {
+               $strAuditCheckResult='Keep my computer up to date is disabled in Automatic Updates.'
+               Write-Host $strAuditCheckResult -ForegroundColor Red
+               Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+             }
+             '2' 
+             {
+               $strAuditCheckResult='Notify of download and installation.'
+               Write-Host $strAuditCheckResult -ForegroundColor Red
+               Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+             }
+             '3' 
+             {
+               $strAuditCheckResult='Automatically download and notify of installation.'
+               Write-Host $strAuditCheckResult -ForegroundColor Red
+               Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+             }
+             '4' 
+             {
+               $strAuditCheckResult='Automatically download and scheduled installation.'
+               Write-Host $strAuditCheckResult -ForegroundColor Green
+               Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+             }
+         }
+     } else {
+        $strAuditCheckResult='(Default) Automatically download and notify of installation.'
+        Write-Host $strAuditCheckResult -ForegroundColor Red
+        Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+     }
+ }
+ 
 
 Write-Host '##################################' -BackgroundColor Black
 Write-Host '##  Listening network services  ##' -BackgroundColor Black
@@ -1217,7 +1640,8 @@ $Results = Get-ProcessInfo
 $Results | Format-Table Name, Owner, ID, Path, CommandLine -auto 
 Get-ProcessInfo | Select-Object Name, Owner, ID, Path, CommandLine | Export-Csv -Path ".\CSV\Processes.csv" -NoTypeInformation 
 
-
+$strSecurityItem = "Hardware Security - BIOS" #ToDo
+$strSecurityItemCheck = "Secure Boot should be enabled"
 Write-Host '###############################' -BackgroundColor Black
 Write-Host '##       BIOS Information    ##' -BackgroundColor Black
 Write-Host '###############################' -BackgroundColor Black
@@ -1231,20 +1655,25 @@ Try
 	$securebootUEFI = Confirm-SecureBootUEFI
 }
 Catch { 
-    Write-Host 'Secure Boot is disabled' -ForegroundColor Red
+    $strAuditCheckResult='Secure Boot is disabled'
+    Write-Host $strAuditCheckResult -ForegroundColor Red
+    Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
     $secBootError=$true
 }
 
 if ($securebootUEFI) 
 {
-	Write-Host 'Secure Boot is enabled' -ForegroundColor Green
+    $strAuditCheckResult='Secure Boot is enabled'
+    Write-Host $strAuditCheckResult -ForegroundColor Green
+    Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+    Write-Host  -ForegroundColor Green
+    
     Get-SecureBootPolicy
 }
-else
-{
-    if($secBootError -eq $false){
-        Write-Host 'Secure Boot is disabled' -ForegroundColor Red
-    }
+elseif (($secBootError -eq $false) -and (!($securebootUEFI))) {
+    $strAuditCheckResult='Secure Boot is disabled'
+    Write-Host $strAuditCheckResult -ForegroundColor Red
+    Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
 }
 
 
@@ -1253,7 +1682,8 @@ Write-Host '##    Explicit Logon Events    ##' -BackgroundColor Black
 Write-Host '#################################' -BackgroundColor Black
 #Get-ExplicitLogonEvents | Format-Table
 
-
+$strSecurityItem = "SMB Security" #ToDo
+$strSecurityItemCheck = "SMBv1 should be disabled"
 Write-Host '#################################' -BackgroundColor Black
 Write-Host '##          SMB v1             ##' -BackgroundColor Black
 Write-Host '#################################' -BackgroundColor Black
@@ -1268,119 +1698,300 @@ Catch {
 
 if ($smbV1State) 
 {
-	Write-Host 'SMBv1 is enabled' -ForegroundColor Red
-    Write-Host ' '
-    Write-Host ' '
-    Get-WindowsOptionalFeature -Online -FeatureName smb1protocol
+    $strAuditCheckResult='SMBv1 is enabled'
+    Write-Host $strAuditCheckResult -ForegroundColor Red
+    Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+    Get-WindowsOptionalFeature -Online -FeatureName smb1protocol | Format-Table
 }
 else
 {
-        Write-Host 'SMBv1 is disabled' -ForegroundColor Green
-        Write-Host ' '
-        Write-Host ' '
+    $strAuditCheckResult='SMBv1 is disabled'
+    Write-Host $strAuditCheckResult -ForegroundColor Green
+    Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+    Get-WindowsOptionalFeature -Online -FeatureName smb1protocol | Format-Table
 }
 
+$strSecurityItem = "SMB Security"
+$strSecurityItemCheck = "Anonymous access to Named Pipes and Shares must be restricted"
+Write-Host '##############################' -BackgroundColor Black
+Write-Host '##    SMB - Null sessions   ##' -BackgroundColor Black
+Write-Host '##############################' -BackgroundColor Black
+Write-Host 'Checking if SMB Null sessions are restricted' -ForegroundColor Black -BackgroundColor White
+## LSA Protection
+$regPath = "HKLM:\SYSTEM\CurrentControlSet\Services\LanManServer\Parameters\"
+$regPathProperty = "RestrictNullSessAccess"
+
+if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
+    $check = Get-ItemProperty -Path $regPath | Select-Object -ExpandProperty $regPathProperty -ErrorAction silentlycontinue
+    Switch($check)
+    {
+         '1' 
+         {
+            $strAuditCheckResult='Null Sessions are restricted'
+            Write-Host  $strAuditCheckResult -ForegroundColor Green
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+
+         }
+         '0' 
+         {
+            $strAuditCheckResult='Null Sessions are not restricted'
+            Write-Host $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+         }
+     }
+ } else {
+        $strAuditCheckResult='Null Sessions are not restricted'
+        Write-Host $strAuditCheckResult -ForegroundColor Red
+        Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+ }
+
+$strSecurityItem = "SMB Security"
+$strSecurityItemCheck = "Anonymous enumeration of SAM accounts should not be allowed."
+Write-Host '######################################' -BackgroundColor Black
+Write-Host '##    Enumeration of SAM accounts   ##' -BackgroundColor Black
+Write-Host '######################################' -BackgroundColor Black
+Write-Host 'Checking if anonymous enumeration of SAM accounts is allowed.' -ForegroundColor Black -BackgroundColor White
+## LSA Protection
+$regPath = "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa\"
+$regPathProperty = "RestrictAnonymousSAM"
+
+if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
+    $check = Get-ItemProperty -Path $regPath | Select-Object -ExpandProperty $regPathProperty -ErrorAction silentlycontinue
+    Switch($check)
+    {
+         '1' 
+         {
+            $strAuditCheckResult='Anonymous enumeration of SAM accounts is not allowed'
+            Write-Host  $strAuditCheckResult -ForegroundColor Green
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+
+         }
+         '0' 
+         {
+            $strAuditCheckResult='Anonymous enumeration of SAM accounts is allowed'
+            Write-Host $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+         }
+     }
+ } else {
+        $strAuditCheckResult='Anonymous enumeration of SAM accounts is allowed'
+        Write-Host $strAuditCheckResult -ForegroundColor Red
+        Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+ }
+
+$strSecurityItem = "SMB Security"
+$strSecurityItemCheck = "Anonymous enumeration of shares must be restricted."
+
+Write-Host '##########################################' -BackgroundColor Black
+Write-Host '##    Anonymous enumeration of shares   ##' -BackgroundColor Black
+Write-Host '##########################################' -BackgroundColor Black
+Write-Host 'Checking if Anonymous enumeration of shares must be restricted.' -ForegroundColor Black -BackgroundColor White
+## LSA Protection
+$regPath = "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa\"
+$regPathProperty = "RestrictAnonymous"
+
+if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
+    $check = Get-ItemProperty -Path $regPath | Select-Object -ExpandProperty $regPathProperty -ErrorAction silentlycontinue
+    Switch($check)
+    {
+         '1' 
+         {
+            $strAuditCheckResult='Anonymous enumeration of shares is restricted.'
+            Write-Host  $strAuditCheckResult -ForegroundColor Green
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+
+         }
+         '0' 
+         {
+            $strAuditCheckResult='Anonymous enumeration of shares is allowed'
+            Write-Host $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+         }
+     }
+ } else {
+        $strAuditCheckResult='Anonymous enumeration of shares is allowed'
+        Write-Host $strAuditCheckResult -ForegroundColor Red
+        Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+ }
+
+$strSecurityItem = "SMB Security"
+$strSecurityItemCheck = "The LanMan authentication level must be set to send NTLMv2 response only, and to refuse LM and NTLM."
+Write-Host '######################################' -BackgroundColor Black
+Write-Host '##    LanMan authentication level   ##' -BackgroundColor Black
+Write-Host '######################################' -BackgroundColor Black
+Write-Host 'Checking if LanMan authentication level is to send NTLMv2 response only, and to refuse LM and NTLM.' -ForegroundColor Black -BackgroundColor White
+## LSA Protection
+$regPath = "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa\"
+$regPathProperty = "LmCompatibilityLevel"
+
+if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
+    $check = Get-ItemProperty -Path $regPath | Select-Object -ExpandProperty $regPathProperty -ErrorAction silentlycontinue
+    Switch($check)
+    {
+         '5' 
+         {
+            $strAuditCheckResult='The LanMan authentication level is set to send NTLMv2 response only, and to refuse LM and NTLM.'
+            Write-Host  $strAuditCheckResult -ForegroundColor Green
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+
+         }
+         '4' 
+         {
+            $strAuditCheckResult='Send NTLMv2 response only/refuse LM'
+            Write-Host $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+         }
+         '3'
+         {
+            $strAuditCheckResult='Send NTLMv2 response only'
+            Write-Host $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+         }
+         '2'
+         {
+            $strAuditCheckResult='Send NTLM response only'
+            Write-Host $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+         }
+         '1'
+         {
+            $strAuditCheckResult='Send LM & NTLM - use NTLMv2 session security if negotiated.'
+            Write-Host $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+         }
+         '0'
+         {
+            $strAuditCheckResult='Send LM & NTLM responses'
+            Write-Host $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+         }
+     }
+ } else {
+        $strAuditCheckResult='Not set - Windows 10 Default: Send NTLMv2 response only'
+        Write-Host $strAuditCheckResult -ForegroundColor Red
+        Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+ }
+
+$strSecurityItem = "SMB Security" #ToDo
 Write-Host '#################################' -BackgroundColor Black
 Write-Host '##         SMB-Signing         ##' -BackgroundColor Black
 Write-Host '#################################' -BackgroundColor Black
 
+$strSecurityItemCheck = "SMB-Signing should be enabled (Client)"
 Write-Host 'Check if SMB-Signing is enabled (Client)' -ForegroundColor Black -BackgroundColor White
 $regPath = "HKLM:\System\CurrentControlSet\Services\LanmanWorkstation\Parameters"
 $regPathProperty = "EnableSecuritySignature"
 
-if((Test-RegistryValue -Path $regPath -Value $regPathProperty)){
+if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
     $check = Get-ItemProperty -Path $regPath | Select-Object -ExpandProperty $regPathProperty -ErrorAction silentlycontinue
     Switch($check)
     {
          '1' 
          {
-             Write-Host 'SMB-Signing (Client) is enabled' -ForegroundColor Green
-
+            $strAuditCheckResult='SMB-Signing is enabled (Client)'
+            Write-Host $strAuditCheckResult -ForegroundColor Green
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+            Get-WindowsOptionalFeature -Online -FeatureName smb1protocol
          }
          '0' 
          {
-             Write-Host 'SMB-Signing (Client) is disabled' -ForegroundColor Red
+            $strAuditCheckResult='SMB-Signing is disabled (Client)'
+            Write-Host $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+            Get-WindowsOptionalFeature -Online -FeatureName smb1protocol
          }
      }
  } else {
-    Write-Host 'SMB-Signing (Client) is disabled' -ForegroundColor Red
+    $strAuditCheckResult='SMB-Signing is disabled (Client)'
+    Write-Host $strAuditCheckResult -ForegroundColor Red
+    Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+    Get-WindowsOptionalFeature -Online -FeatureName smb1protocol
  }
 
+$strSecurityItemCheck = "SMB-Signing should be enforced (Client)"
 Write-Host 'Check if SMB-Signing is enforced (Client)' -ForegroundColor Black -BackgroundColor White
 $regPath = "HKLM:\System\CurrentControlSet\Services\LanmanWorkstation\Parameters"
 $regPathProperty = "RequireSecuritySignature"
 
-if((Test-RegistryValue -Path $regPath -Value $regPathProperty)){
+if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
     $check = Get-ItemProperty -Path $regPath | Select-Object -ExpandProperty $regPathProperty -ErrorAction silentlycontinue
     Switch($check)
     {
          '1' 
          {
-             Write-Host 'SMB-Signing (Client) is enforced' -ForegroundColor Green
-             Write-Host ' '
-             Write-Host ' '
+            $strAuditCheckResult='SMB-Signing is enforced (Client)'
+            Write-Host $strAuditCheckResult -ForegroundColor Green
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
 
          }
          '0' 
          {
-             Write-Host 'SMB-Signing (Client) is not enforced and can be downgraded' -ForegroundColor Red
-             Write-Host ' '
-             Write-Host ' '
+            $strAuditCheckResult='SMB-Signing is not enforced and can be downgraded (Client)'
+            Write-Host $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
          }
      }
  } else {
-    Write-Host 'SMB-Signing (Client) is not enforced and can be downgraded' -ForegroundColor Red
-    ' '
+    $strAuditCheckResult='SMB-Signing is not enforced and can be downgraded (Client)'
+    Write-Host $strAuditCheckResult -ForegroundColor Red
+    Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
  }
 
- Write-Host 'Check if SMB-Signing is enabled (server)' -ForegroundColor Black -BackgroundColor White
+$strSecurityItemCheck = "SMB-Signing should be enabled (Server)"
+Write-Host 'Check if SMB-Signing is enabled (Server)' -ForegroundColor Black -BackgroundColor White
 $regPath = "HKLM:\System\CurrentControlSet\Services\LanManServer\Parameters"
 $regPathProperty = "EnableSecuritySignature"
 
-if((Test-RegistryValue -Path $regPath -Value $regPathProperty)){
+if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
     $check = Get-ItemProperty -Path $regPath | Select-Object -ExpandProperty $regPathProperty -ErrorAction silentlycontinue
     Switch($check)
     {
          '1' 
          {
-             Write-Host 'SMB-Signing (server) is enabled' -ForegroundColor Green
-
+            $strAuditCheckResult='SMB-Signing is enabled (Server)'
+            Write-Host $strAuditCheckResult -ForegroundColor Green
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
          }
          '0' 
          {
-             Write-Host 'SMB-Signing (server) is disabled' -ForegroundColor Red
+            $strAuditCheckResult='SMB-Signing is disabled (Server)'
+            Write-Host $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false 
          }
      }
  } else {
-    Write-Host 'SMB-Signing (server) is disabled' -ForegroundColor Red
-    ' '
+    $strAuditCheckResult='SMB-Signing is disabled (Server)'
+    Write-Host $strAuditCheckResult -ForegroundColor Red
+    Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false 
  }
 
+ $strSecurityItemCheck = "SMB-Signing should be enforced (Server)"
 Write-Host 'Check if SMB-Signing is enforced (server)' -ForegroundColor Black -BackgroundColor White
 $regPath = "HKLM:\System\CurrentControlSet\Services\LanManServer\Parameters"
 $regPathProperty = "RequireSecuritySignature"
 
-if((Test-RegistryValue -Path $regPath -Value $regPathProperty)){
+if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
     $check = Get-ItemProperty -Path $regPath | Select-Object -ExpandProperty $regPathProperty -ErrorAction silentlycontinue
     Switch($check)
     {
          '1' 
          {
-             Write-Host 'SMB-Signing (server) is enforced' -ForegroundColor Green
-             Write-Host ' '
-             Write-Host ' '
+            $strAuditCheckResult='SMB-Signing is enforced (Server)'
+            Write-Host $strAuditCheckResult -ForegroundColor Green
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
 
          }
          '0' 
          {
-             Write-Host 'SMB-Signing (server) is not enforced and can be downgraded' -ForegroundColor Red
-             Write-Host ' '
-             Write-Host ' '
+            $strAuditCheckResult='SMB-Signing is not enforced and can be downgraded (Server)'
+            Write-Host $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
          }
      }
  } else {
-    Write-Host 'SMB-Signing (server) is not enforced and can be downgraded' -ForegroundColor Red
-    ' '
+    $strAuditCheckResult='SMB-Signing is not enforced and can be downgraded (Server)'
+    Write-Host $strAuditCheckResult -ForegroundColor Red
+    Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
  }
 
 
@@ -1411,6 +2022,19 @@ Get-ScheduledTasks | Format-Table Name, Enabled, UserId, LastRunTime, NextRunTim
 Get-ScheduledTasks | Export-Csv -Path ".\CSV\Scheduled Tasks.csv" -NoTypeInformation
 
 Write-Host '#################################' -BackgroundColor Black
+Write-Host '##        AuditPolicy          ##' -BackgroundColor Black
+Write-Host '#################################' -BackgroundColor Black
+Write-Host 'Getting the Audit Policy' -ForegroundColor Black -BackgroundColor White
+if (((Get-Culture).Parent.Name) -match "de"){
+    Get-SecurityAuditPolicyDE | Format-Table Category, Subcategory,AuditSuccess,AuditFailure -AutoSize -Wrap
+    Get-SecurityAuditPolicyDE | Select-Object Category, Subcategory,AuditSuccess,AuditFailure | Export-Csv -Path ".\CSV\Audit Settings.csv" -NoTypeInformation
+} else {
+    Get-SecurityAuditPolicy | Format-Table Category, Subcategory,AuditSuccess,AuditFailure -AutoSize -Wrap
+    Get-SecurityAuditPolicy | Select-Object Category, Subcategory,AuditSuccess,AuditFailure | Export-Csv -Path ".\CSV\Audit Settings.csv" -NoTypeInformation
+
+}
+
+Write-Host '#################################' -BackgroundColor Black
 Write-Host '##          Services           ##' -BackgroundColor Black
 Write-Host '#################################' -BackgroundColor Black
 Write-Host 'Enumerating running services' -ForegroundColor Black -BackgroundColor White
@@ -1424,9 +2048,19 @@ Get-WmiObject win32_service | Sort-Object DisplayName | Select-Object Name, Disp
 Write-Host '#################################' -BackgroundColor Black
 Write-Host '##       CIS-Hardening         ##' -BackgroundColor Black
 Write-Host '#################################' -BackgroundColor Black
-Invoke-WebRequest -Uri "https://github.com/scipag/HardeningKitty/archive/refs/heads/master.zip" -OutFile ".\HardeningKitty.zip"
-Expand-Archive -Path ".\HardeningKitty.zip"
+$path = ".\HardeningKitty"
+If(!(test-path $path))
+{
+    Invoke-WebRequest -Uri "https://github.com/scipag/HardeningKitty/archive/refs/heads/master.zip" -OutFile ".\HardeningKitty.zip"
+    Expand-Archive -Path ".\HardeningKitty.zip"
+}
+
 Import-Module ".\HardeningKitty\HardeningKitty-master\Invoke-HardeningKitty.ps1"
 Invoke-HardeningKitty -FileFindingList ".\HardeningKitty\HardeningKitty-master\lists\finding_list_cis_microsoft_windows_10_enterprise_20h2_machine.csv" -SkipMachineInformation -Report "Audit" -ReportFile ".\CSV\Hardening CIS.csv"
 
 
+Write-Host '###########################################' -BackgroundColor Black
+Write-Host '##   Important-Hardening Overview        ##' -BackgroundColor Black
+Write-Host '###########################################' -BackgroundColor Black
+$SecurityItemAuditResults | Sort-Object SecurityItem | Format-Table SecurityItem, check, result, passed
+$SecurityItemAuditResults | Sort-Object SecurityItem, Check | Select-Object SecurityItem, check, result, passed | Export-Csv  -Path ".\CSV\Important Hardening.csv" -NoTypeInformation
