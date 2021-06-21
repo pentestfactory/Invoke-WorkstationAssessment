@@ -1513,7 +1513,7 @@ Write-Host '#    Windows Defender  ##' -BackgroundColor Black
 Write-Host '#########################' -BackgroundColor Black
 $defenderPreferences = Get-MpPreference
 
-if(($defenderDetails.RealTimeProtectionEnabled)){
+if(-not ($defenderPreferences.DisableRealtimeMonitoring)){
     $strAuditCheckResult='Defender is active'
     Write-Host $strAuditCheckResult -ForegroundColor Green
     Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
@@ -1540,19 +1540,19 @@ if(($defenderDetails.RealTimeProtectionEnabled)){
           {
             $strAuditCheckResult='Windows installer allows elevated privileges to standard users - AlwaysInstallElevated is enabled'
             Write-Host $strAuditCheckResult -ForegroundColor Red
-            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
           }
           '0' 
           {
             $strAuditCheckResult='Windows installer denies elevated privileges to standard users - AlwaysInstallElevated is disabled'
-            Write-Host $strAuditCheckResult -ForegroundColor Red
-            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+            Write-Host $strAuditCheckResult -ForegroundColor Green
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
           }
       }
   } else {
-    $strAuditCheckResult='Windows installer denies elevated privileges to standard users - AlwaysInstallElevated is disabled'
-    Write-Host $strAuditCheckResult -ForegroundColor Red
-    Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+    $strAuditCheckResult='(default) Windows installer denies elevated privileges to standard users - AlwaysInstallElevated is disabled'
+    Write-Host $strAuditCheckResult -ForegroundColor Green
+    Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
   }
 
  ####################### Installed Software ###################################################
