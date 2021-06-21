@@ -899,6 +899,7 @@ If(!(test-path $path))
 # Settings CSV
 $SecurityItemAuditResults = @()
 
+####################### PowerShell Version ###################################################
 Write-Host '#########################' -BackgroundColor Black
 Write-Host '## PowerShell Version  ##' -BackgroundColor Black
 Write-Host '#########################' -BackgroundColor Black
@@ -932,7 +933,7 @@ if(((Get-WindowsOptionalFeature -Online | Where-Object {$_.FeatureName -match "P
     Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
 }
 
-
+####################### PowerShell Module Logging ###################################################
 $strSecurityItem = "PowerShell - Module Logging"
 $strSecurityItemCheck = "PowerShell Module Logging should be enabled"
 Write-Host '####################' -BackgroundColor Black
@@ -971,7 +972,7 @@ else{
          Write-Host $strAuditCheckResult -ForegroundColor Red    
 }
 
-
+####################### PowerShell - Script Block Logging ###################################################
 $strSecurityItem = "PowerShell - Script Block Logging"
 $strSecurityItemCheck = "PowerShell Script Block Logging should be enabled"
 Write-Host '##########################' -BackgroundColor Black
@@ -1007,7 +1008,7 @@ else{
         Write-Host $strAuditCheckResult -ForegroundColor Red
 }
 
-
+####################### PowerShell - Transcript Logging ###################################################
 $strSecurityItem = "PowerShell - Transcript Logging"
 $strSecurityItemCheck = "PowerShell Transcript Logging should be enabled"
 Write-Host '#########################' -BackgroundColor Black
@@ -1088,7 +1089,7 @@ else
          Write-Host $strAuditCheckResult -ForegroundColor Red
 }
 
-
+####################### PowerShell - Language Mode ###################################################
 $strSecurityItem = "PowerShell - Language Mode"
 $strSecurityItemCheck = "PowerShell Constrained Language Mode should be active"
 Write-Host '#########################' -BackgroundColor Black
@@ -1111,7 +1112,7 @@ Switch($ExecutionContext.SessionState.LanguageMode)
         }
     }
 
-
+####################### Sysmon ###################################################
 $strSecurityItem = "Logging - Sysmon" # TODO
 $strSecurityItemCheck = "Sysmon should be installed and configured"
 Write-Host '#########################' -BackgroundColor Black
@@ -1120,7 +1121,7 @@ Write-Host '#########################' -BackgroundColor Black
 Write-Host 'Checking if Sysmon is installed' -ForegroundColor Black -BackgroundColor White
 Test-SysmonInstalled
 
-
+####################### LSA Protection ###################################################
 $strSecurityItem = "Credential Theft - LSA Protection"
 $strSecurityItemCheck = "LSA Protection should be enabled"
 Write-Host '#########################' -BackgroundColor Black
@@ -1155,7 +1156,7 @@ if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
         Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
  }
 
- 
+ ####################### LM Hashes ###################################################
 $strSecurityItem = "Credential Theft - LM Hashes"
 $strSecurityItemCheck = "Storing LM Hashes should be prevented"
 Write-Host '#########################' -BackgroundColor Black
@@ -1188,7 +1189,7 @@ if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
     Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
  }
 
-## WDIGEST
+####################### WDigest ###################################################
 # https://www.praetorian.com/blog/mitigating-mimikatz-wdigest-cleartext-credential-theft/
 $strSecurityItem = "Credential Theft - WDigest"
 $strSecurityItemCheck = "WDigest should be disabled"
@@ -1222,7 +1223,7 @@ if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
     Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
  }
 
-
+####################### AppLocker ###################################################
 Write-Host '#########################' -BackgroundColor Black
 Write-Host '##       AppLocker     ##' -BackgroundColor Black
 Write-Host '#########################' -BackgroundColor Black
@@ -1237,45 +1238,155 @@ Get-AppLockerPolicy -Effective -Xml | Set-Content ('.\applocker.xml')
 #PS C:\> Get-ChildItem -Path HKLM:Software\Policies\Microsoft\Windows\SrpV2 -Recurse
 #PS C:\> Get-AppLockerPolicy -Domain -LDAP "LDAP:// DC13.Contoso.com/CN={31B2F340-016D-11D2-945F-00C04FB984F9},CN=Policies,CN=System,DC=Contoso,DC=com
 
+####################### Device Guard ###################################################
 $strSecurityItem = "Credential Theft - Device Guard" # TODO
-$strSecurityItemCheck = "Device Guard should be enabled and configured"
 Write-Host '#########################' -BackgroundColor Black
 Write-Host '##     Device Guard    ##' -BackgroundColor Black
 Write-Host '#########################' -BackgroundColor Black
-Write-Host 'Checking if Device Guard is in use' -ForegroundColor Black -BackgroundColor White
-Get-CimInstance -ClassName Win32_DeviceGuard -Namespace root\Microsoft\Windows\DeviceGuard | Format-List
 
-$SecurityProps = Get-CSDeviceGuardStatus
-$SecurityProps.AvailableSecurityProperties
 
+if(((Get-CSDeviceGuardStatus).AvailableSecurityProperties) -contains "BaseVirtualizationSupport"){
+    Write-Host "BaseVirtualizationSupport is available, checking if configured ..."  -ForegroundColor Black -BackgroundColor White
+} else { Write-Host "BaseVirtualizationSupport is not available" -ForegroundColor DarkGray -BackgroundColor white }
+
+if(((Get-CSDeviceGuardStatus).AvailableSecurityProperties) -contains "SecureBoot"){
+    Write-Host "SecureBoot is available, checking if configured ..."  -ForegroundColor Black -BackgroundColor White
+} else { Write-Host "SecureBoot is not available" -ForegroundColor DarkGray -BackgroundColor white }
+
+if(((Get-CSDeviceGuardStatus).AvailableSecurityProperties) -contains "DMAProtection"){
+    Write-Host "DMAProtection is available, checking if configured ..." -ForegroundColor Black -BackgroundColor White
+} else { Write-Host "DMAProtection is not available"  -ForegroundColor DarkGray -BackgroundColor white}
+
+if(((Get-CSDeviceGuardStatus).AvailableSecurityProperties) -contains "SecureMemoryOverwrite"){
+    Write-Host "SecureMemoryOverwrite is available, checking if configured ..." -ForegroundColor Black -BackgroundColor White
+} else { Write-Host "SecureMemoryOverwrite is not available" -ForegroundColor DarkGray -BackgroundColor white }
+
+if(((Get-CSDeviceGuardStatus).AvailableSecurityProperties) -contains "UEFICodeReadOnly"){
+    Write-Host "UEFICodeReadOnly is available, checking if configured ..." -ForegroundColor Black -BackgroundColor White
+} else { Write-Host "UEFICodeReadOnly is not available" -ForegroundColor DarkGray -BackgroundColor white }
+
+if(((Get-CSDeviceGuardStatus).AvailableSecurityProperties) -contains "SMMSecurityMitigations1.0"){
+    Write-Host "SMMSecurityMitigations1.0 is available, checking if configured ..." -ForegroundColor Black -BackgroundColor White
+} else { Write-Host "SMMSecurityMitigations1.0 is not available" -ForegroundColor DarkGray -BackgroundColor white }
 
 $strSecurityItem = "Credential Theft - Credential Guard"
-$strSecurityItemCheck = "Credential Guard should be enabled and running"
-Write-Host '###########################' -BackgroundColor Black
-Write-Host '##   Credential Guard    ##' -BackgroundColor Black
-Write-Host '###########################' -BackgroundColor Black
-Write-Host 'Checking if Credential Guard is in use' -ForegroundColor Black -BackgroundColor White
-# https://github.com/MicrosoftDocs/windows-itpro-docs/blob/public/windows/security/identity-protection/credential-guard/credential-guard-manage.md
-$DevGuard = Get-CimInstance -ClassName Win32_DeviceGuard -Namespace root\Microsoft\Windows\DeviceGuard
-$check = $DevGuard.SecurityServicesConfigured -contains 1 -and $DevGuard.SecurityServicesRunning -contains 1
+# Check if CredentialGuard is configured
+if(((Get-CSDeviceGuardStatus).SecurityServicesConfigured) -contains "CredentialGuard"){
+    $strSecurityItemCheck = "Credential Guard must be configured"
+    $strAuditCheckResult="Credential Guard is configured"
+    Write-Host $strAuditCheckResult -ForegroundColor Green
+    Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
 
-Switch($check)
-{
-        $true 
-        {
-            $strAuditCheckResult='Credential Guard is running'
+    #Check if CredentialGuard  is running
+    if(((Get-CSDeviceGuardStatus).SecurityServicesConfigured) -contains "CredentialGuard"){
+        $strSecurityItemCheck = "Credential Guard must be running"
+        $strAuditCheckResult="Credential Guard is running"
+        Write-Host $strAuditCheckResult -ForegroundColor Green
+        Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+    } else { 
+        $strSecurityItemCheck = "Credential Guard must be running"
+        $strAuditCheckResult="Credential Guard is not running"
+        Write-Host $strAuditCheckResult -ForegroundColor Red
+        Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+    }
+} else { 
+    $strSecurityItemCheck = "Credential Guard must be configured"
+    $strAuditCheckResult="Credential Guard is not configured"
+    Write-Host $strAuditCheckResult -ForegroundColor Red
+    Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+}
+
+
+# Check if HVCI is configured
+if(((Get-CSDeviceGuardStatus).SecurityServicesConfigured) -contains "HypervisorEnforcedCodeIntegrity"){
+    $strSecurityItemCheck = "Virtualization-based protection of code must be configured"
+    $strAuditCheckResult="Virtualization-based protection of code integrity is configured"
+    Write-Host $strAuditCheckResult -ForegroundColor Green
+    Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+    
+    #Check if HVCI is running
+    
+    if(((Get-CSDeviceGuardStatus).SecurityServicesRunning) -contains "HypervisorEnforcedCodeIntegrity"){
+        $strSecurityItemCheck = "Virtualization-based protection of code must be running"    
+        $regPath = "HKLM:\\SOFTWARE\Policies\Microsoft\Windows\DeviceGuard\"
+        $regPathProperty = HypervisorEnforcedCodeIntegrity
+        
+        if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
+            $check = Get-ItemProperty -Path $regPath | Select-Object -ExpandProperty $regPathProperty -ErrorAction silentlycontinue
+            Switch($check)
+            {
+                '1' 
+                {
+                    $strSecurityItemCheck = "Virtualization-based protection of code integrity must be running with UEFI lock enabled" 
+                    $strAuditCheckResult='Virtualization-based protection of code integrity is running with UEFI lock enabled'
+                    Write-Host $strAuditCheckResult -ForegroundColor Green
+                    Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+                }
+                '0' 
+                {
+                    $strSecurityItemCheck = "Virtualization-based protection of code integrity must be running with UEFI lock enabled" 
+                    $strAuditCheckResult='Virtualization-based protection of code integrity is running without UEFI lock'
+                    Write-Host $strAuditCheckResult -ForegroundColor Red
+                    Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+                }
+            }
+        } else {
+            $strSecurityItemCheck = "Virtualization-based protection of code integrity must be running with UEFI lock enabled" 
+            $strAuditCheckResult='Virtualization-based protection of code integrity is running with UEFI lock enabled'
+            Write-Host $strAuditCheckResult -ForegroundColor Green
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+        }
+        Write-Host "Virtualization-based protection of code integrity is running" -ForegroundColor Green
+        
+        #UsermodeCodeIntegrityPolicyEnforcementStatus
+        $strSecurityItemCheck = "Code Integrity Policy Enforcement Status (Usermode) must be set to Enforcement Mode"
+        if(((Get-CSDeviceGuardStatus).UsermodeCodeIntegrityPolicyEnforcementStatus) -match "AuditMode"){
+            $strAuditCheckResult="Code Integrity Policy Enforcement Status (Usermode) is set to Audit Mode"
+            Write-Host $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+        } elseif(((Get-CSDeviceGuardStatus).UsermodeCodeIntegrityPolicyEnforcementStatus) -match "EnforcementMode"){
+            $strAuditCheckResult="Code Integrity Policy Enforcement Status (Usermode) is set to Enforcement Mode"
             Write-Host $strAuditCheckResult -ForegroundColor Green
             Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
-
-        }
-        $false 
-        {
-            $strAuditCheckResult='Credential Guard is not running'
+        } else { 
+            $strAuditCheckResult="Code Integrity Policy Enforcement Status (Usermode) is set to Off"
             Write-Host $strAuditCheckResult -ForegroundColor Red
             Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
         }
-    }
 
+        #CodeIntegrityPolicyEnforcementStatus
+        $strSecurityItemCheck = "Code Integrity Policy Enforcement Status must be set to Enforcement Mode"
+        if(((Get-CSDeviceGuardStatus).CodeIntegrityPolicyEnforcementStatus) -match "AuditMode"){
+            $strAuditCheckResult="Code Integrity Policy Enforcement Status is set to Audit Mode"
+            Write-Host $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+        } elseif(((Get-CSDeviceGuardStatus).CodeIntegrityPolicyEnforcementStatus) -match "EnforcementMode"){
+            $strAuditCheckResult="Code Integrity Policy Enforcement Status is set to EnforcementMode"
+            Write-Host $strAuditCheckResult -ForegroundColor Green
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+        } else { 
+            $strAuditCheckResult="Code Integrity Policy Enforcement Status is set to Off"
+            Write-Host $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+        }
+
+
+    } else { 
+        $strSecurityItemCheck = "Virtualization-based protection of code must be running"
+        $strAuditCheckResult =  "Virtualization-based protection of code integrity is not running"
+        Write-Host $strAuditCheckResult -ForegroundColor Red
+        Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+    }
+} else { 
+    $strSecurityItemCheck = "Virtualization-based protection of code must be configured"
+    $strAuditCheckResult="Virtualization-based protection of code integrity is not configured"
+    Write-Host $strAuditCheckResult -ForegroundColor Red
+    Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+}
+
+
+
+####################### Windows Firewall ###################################################
 $strSecurityItem = "Windows Firewall - Private Profile"
 $strSecurityItemCheck = "Private Profile - Firewall should be enabled"
 Write-Host '#########################' -BackgroundColor Black
@@ -1334,6 +1445,7 @@ Get-NetFirewallRule | Select-Object -Property Name, DisplayName, DisplayGroup,
 @{Name='RemoteAddress';Expression={($PSItem | Get-NetFirewallAddressFilter).RemoteAddress}}, Enabled, Profile, Direction, Action | 
 Export-Csv -Path ".\CSV\Windows Firewall Rules.csv" -NoTypeInformation 
 
+####################### LLMNR ###################################################
 $strSecurityItem = "DNS Spoofing - LLMNR"
 $strSecurityItemCheck = "LLMNR should be disabled"
 Write-Host '#########################' -BackgroundColor Black
@@ -1366,6 +1478,8 @@ if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
     Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
  }
 
+
+ ####################### NBNS ###################################################
  $strSecurityItem = "DNS Spoofing - NBNS" #ToDo
  $strSecurityItemCheck = "NBNS should be disabled"
 Write-Host '#########################' -BackgroundColor Black
@@ -1389,7 +1503,8 @@ Write-Host '2 - NetBIOS is disabled' -ForegroundColor Green
 # Get-ChildItem $regkey |foreach { Set-ItemProperty -Path "$regkey\$($_.pschildname)" -Name NetbiosOptions -Value 2 -Verbose}
 # http://woshub.com/how-to-disable-netbios-over-tcpip-and-llmnr-using-gpo/#h2_4
 
-# Windows Defender
+
+####################### AV ###################################################
 # https://www.windowscentral.com/how-manage-microsoft-defender-antivirus-powershell-windows-10
 $strSecurityItem = "Malware Protection - AV" #ToDo
 $strSecurityItemCheck = "An AV solution should be installed and active"
@@ -1407,7 +1522,7 @@ if(($defenderDetails.RealTimeProtectionEnabled)){
     Write-Host $strAuditCheckResult -ForegroundColor Green
     Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
  }
-
+####################### Windows Installer ###################################################
  $strSecurityItem = "Malware Protection - Hardening" #ToDo
  $strSecurityItemCheck = "Windows Installer Always install with elevated privileges"
  Write-Host '#################################' -BackgroundColor Black
@@ -1440,6 +1555,7 @@ if(($defenderDetails.RealTimeProtectionEnabled)){
     Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
   }
 
+ ####################### Installed Software ###################################################
 Write-Host '##########################' -BackgroundColor Black
 Write-Host '##  Installed Software  ##' -BackgroundColor Black
 Write-Host '##########################' -BackgroundColor Black
@@ -1457,6 +1573,7 @@ Get-WindowsOptionalFeature -Online | where-object {$_.State -eq "Enabled"} | Sor
 Write-Host 'Getting a list of installed updates:' -ForegroundColor Black -BackgroundColor White
 get-wmiobject -class win32_quickfixengineering | Sort-Object installedOn | Export-Csv -Path ".\CSV\Windows Updates.csv" -NoTypeInformation
 
+####################### Windows Update ###################################################
 $strSecurityItem = "Malware Protection - Windows Update" #ToDo
 $strSecurityItemCheck = "Auto Update should be enabled"
 Write-Host '#################################' -BackgroundColor Black
@@ -1534,7 +1651,7 @@ if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
      }
  }
  
-
+####################### Network services ###################################################
 Write-Host '##################################' -BackgroundColor Black
 Write-Host '##  Listening network services  ##' -BackgroundColor Black
 Write-Host '##################################' -BackgroundColor Black
@@ -1596,6 +1713,7 @@ Get-NetUDPEndpoint |
         Sort-Object -Property LocalPort, UserName | Export-Csv -Path ".\CSV\Network Services - UDP.csv" -NoTypeInformation 
 
 
+####################### Local Users ###################################################
 Write-Host '###################' -BackgroundColor Black
 Write-Host '##  Local Users  ##' -BackgroundColor Black
 Write-Host '###################' -BackgroundColor Black
@@ -1631,7 +1749,7 @@ Get-LocalUser |
         }
     } | Export-Csv -Path ".\CSV\Users.csv" -NoTypeInformation 
 
-
+####################### Processes ###################################################
 Write-Host '###################' -BackgroundColor Black
 Write-Host '##   Processes   ##' -BackgroundColor Black
 Write-Host '###################' -BackgroundColor Black
@@ -1640,6 +1758,7 @@ $Results = Get-ProcessInfo
 $Results | Format-Table Name, Owner, ID, Path, CommandLine -auto 
 Get-ProcessInfo | Select-Object Name, Owner, ID, Path, CommandLine | Export-Csv -Path ".\CSV\Processes.csv" -NoTypeInformation 
 
+####################### BIOS ###################################################
 $strSecurityItem = "Hardware Security - BIOS" #ToDo
 $strSecurityItemCheck = "Secure Boot should be enabled"
 Write-Host '###############################' -BackgroundColor Black
@@ -1676,12 +1795,13 @@ elseif (($secBootError -eq $false) -and (!($securebootUEFI))) {
     Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
 }
 
-
+####################### Login Events ###################################################
 Write-Host '#################################' -BackgroundColor Black
 Write-Host '##    Explicit Logon Events    ##' -BackgroundColor Black
 Write-Host '#################################' -BackgroundColor Black
 #Get-ExplicitLogonEvents | Format-Table
 
+####################### SMBv1 ###################################################
 $strSecurityItem = "SMB Security" #ToDo
 $strSecurityItemCheck = "SMBv1 should be disabled"
 Write-Host '#################################' -BackgroundColor Black
@@ -1711,13 +1831,14 @@ else
     Get-WindowsOptionalFeature -Online -FeatureName smb1protocol | Format-Table
 }
 
+####################### Anonymous access to Named Pipes and Shares must be restricted ###################################################
 $strSecurityItem = "SMB Security"
 $strSecurityItemCheck = "Anonymous access to Named Pipes and Shares must be restricted"
 Write-Host '##############################' -BackgroundColor Black
 Write-Host '##    SMB - Null sessions   ##' -BackgroundColor Black
 Write-Host '##############################' -BackgroundColor Black
 Write-Host 'Checking if SMB Null sessions are restricted' -ForegroundColor Black -BackgroundColor White
-## LSA Protection
+
 $regPath = "HKLM:\SYSTEM\CurrentControlSet\Services\LanManServer\Parameters\"
 $regPathProperty = "RestrictNullSessAccess"
 
@@ -1745,13 +1866,15 @@ if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
         Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
  }
 
+
+ ####################### Anonymous enumeration of SAM accounts should not be allowed. ###################################################
 $strSecurityItem = "SMB Security"
 $strSecurityItemCheck = "Anonymous enumeration of SAM accounts should not be allowed."
 Write-Host '######################################' -BackgroundColor Black
 Write-Host '##    Enumeration of SAM accounts   ##' -BackgroundColor Black
 Write-Host '######################################' -BackgroundColor Black
 Write-Host 'Checking if anonymous enumeration of SAM accounts is allowed.' -ForegroundColor Black -BackgroundColor White
-## LSA Protection
+
 $regPath = "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa\"
 $regPathProperty = "RestrictAnonymousSAM"
 
@@ -1779,6 +1902,7 @@ if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
         Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
  }
 
+####################### Anonymous enumeration of shares must be restricted. ###################################################
 $strSecurityItem = "SMB Security"
 $strSecurityItemCheck = "Anonymous enumeration of shares must be restricted."
 
@@ -1814,13 +1938,14 @@ if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
         Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
  }
 
+####################### LM Authentication Level ###################################################
 $strSecurityItem = "SMB Security"
 $strSecurityItemCheck = "The LanMan authentication level must be set to send NTLMv2 response only, and to refuse LM and NTLM."
 Write-Host '######################################' -BackgroundColor Black
 Write-Host '##    LanMan authentication level   ##' -BackgroundColor Black
 Write-Host '######################################' -BackgroundColor Black
 Write-Host 'Checking if LanMan authentication level is to send NTLMv2 response only, and to refuse LM and NTLM.' -ForegroundColor Black -BackgroundColor White
-## LSA Protection
+
 $regPath = "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa\"
 $regPathProperty = "LmCompatibilityLevel"
 
@@ -1872,7 +1997,8 @@ if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
         Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
  }
 
-$strSecurityItem = "SMB Security" #ToDo
+####################### SMB-Signing ###################################################
+ $strSecurityItem = "SMB Security" #ToDo
 Write-Host '#################################' -BackgroundColor Black
 Write-Host '##         SMB-Signing         ##' -BackgroundColor Black
 Write-Host '#################################' -BackgroundColor Black
@@ -1994,7 +2120,7 @@ if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
     Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
  }
 
-
+####################### User Rights Assignment ###################################################
  Write-Host '#################################' -BackgroundColor Black
  Write-Host '##   User Rights Assignment    ##' -BackgroundColor Black
  Write-Host '#################################' -BackgroundColor Black
@@ -2002,6 +2128,8 @@ if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
  Get-UserRightsAssignment | Sort-Object -Property PrivilegeName | Format-Table 
  Get-UserRightsAssignment | Sort-Object -Property PrivilegeName | Export-Csv -Path ".\CSV\User Rights Assignment.csv" -NoTypeInformation
 
+
+ ####################### Bitlocker ###################################################
 Write-Host '#################################' -BackgroundColor Black
 Write-Host '##         Bitlocker           ##' -BackgroundColor Black
 Write-Host '#################################' -BackgroundColor Black
@@ -2014,6 +2142,7 @@ Catch {
     Write-Host 'Error getting Bitlocker volumes - Bitlocker may not be available' -ForegroundColor Red
 }
 
+####################### ScheduledTasks ###################################################
 Write-Host '#################################' -BackgroundColor Black
 Write-Host '##     ScheduledTasks          ##' -BackgroundColor Black
 Write-Host '#################################' -BackgroundColor Black
@@ -2021,6 +2150,7 @@ Write-Host 'Enumerating ScheduledTasks (filtered - non Microsoft)' -ForegroundCo
 Get-ScheduledTasks | Format-Table Name, Enabled, UserId, LastRunTime, NextRunTime, Status, Action, Arguments
 Get-ScheduledTasks | Export-Csv -Path ".\CSV\Scheduled Tasks.csv" -NoTypeInformation
 
+####################### AuditPolicy ###################################################
 Write-Host '#################################' -BackgroundColor Black
 Write-Host '##        AuditPolicy          ##' -BackgroundColor Black
 Write-Host '#################################' -BackgroundColor Black
@@ -2034,6 +2164,7 @@ if (((Get-Culture).Parent.Name) -match "de"){
 
 }
 
+####################### Services ###################################################
 Write-Host '#################################' -BackgroundColor Black
 Write-Host '##          Services           ##' -BackgroundColor Black
 Write-Host '#################################' -BackgroundColor Black
@@ -2045,6 +2176,9 @@ Get-WmiObject win32_service | Sort-Object DisplayName | Select-Object Name, Disp
 # TODO
 # Registry Auditing for Credential Theft - https://medium.com/threatpunter/detecting-attempts-to-steal-passwords-from-the-registry-7512674487f8
 # 
+
+
+####################### CIS-Hardening ###################################################
 Write-Host '#################################' -BackgroundColor Black
 Write-Host '##       CIS-Hardening         ##' -BackgroundColor Black
 Write-Host '#################################' -BackgroundColor Black
@@ -2058,7 +2192,7 @@ If(!(test-path $path))
 Import-Module ".\HardeningKitty\HardeningKitty-master\Invoke-HardeningKitty.ps1"
 Invoke-HardeningKitty -FileFindingList ".\HardeningKitty\HardeningKitty-master\lists\finding_list_cis_microsoft_windows_10_enterprise_20h2_machine.csv" -SkipMachineInformation -Report "Audit" -ReportFile ".\CSV\Hardening CIS.csv"
 
-
+####################### Important-Hardening Overview ###################################################
 Write-Host '###########################################' -BackgroundColor Black
 Write-Host '##   Important-Hardening Overview        ##' -BackgroundColor Black
 Write-Host '###########################################' -BackgroundColor Black
