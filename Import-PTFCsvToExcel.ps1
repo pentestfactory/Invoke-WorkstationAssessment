@@ -1,12 +1,46 @@
-﻿
+
+Function Get-ExcelComObjRelease
+{
+<#
+.SYNOPSIS
+    Releases the ComObject created to interact with Microsoft Excel.
+.DESCRIPTION
+    Releases the ComObject created to interact with Microsoft Excel.
+.PARAMETER ComObjtoRelease
+    ComObjtoRelease
+.PARAMETER Final
+    Final
+#>
+    param(
+        [Parameter(Mandatory = $true)]
+        $ComObjtoRelease,
+
+        [Parameter(Mandatory = $false)]
+        [bool] $Final = $false
+    )
+    # https://msdn.microsoft.com/en-us/library/system.runtime.interopservices.marshal.releasecomobject(v=vs.110).aspx
+    # https://msdn.microsoft.com/en-us/library/system.runtime.interopservices.marshal.finalreleasecomobject(v=vs.110).aspx
+    Write-Host "Release object"
+	If ($Final)
+    {
+        [System.Runtime.InteropServices.Marshal]::FinalReleaseComObject($ComObjtoRelease) | Out-Null
+    }
+    Else
+    {
+        [System.Runtime.InteropServices.Marshal]::ReleaseComObject($ComObjtoRelease) | Out-Null
+    }
+    [System.GC]::Collect()
+    [System.GC]::WaitForPendingFinalizers()
+}
+
 ### Create a new Excel Workbook with one empty sheet
 $excel = New-Object -ComObject excel.application 
-$outputXLSX = "C:\Users\Administrator\Desktop\$(get-date -f yyyyMMdd)_Workstation_Hardening_Assessment.xlsx"
-$csvsPath = "C:\Users\Administrator\Desktop\CSV\"
+$outputXLSX = "$((Get-Item .).FullName)\$(get-date -f yyyyMMdd)_Workstation_Hardening_Assessment.xlsx"
+$csvsPath = "$((Get-Item .).FullName)\CSV\"
 $csvs = Get-ChildItem "$($csvsPath)*.csv"
 
 $excel.SheetsInNewWorkbook = $csvs.Count
-$Workbook = $excel.Workbooks.Add()
+$workbook = $excel.Workbooks.Add()
 $sheet = 1
 
 # Image
@@ -18,12 +52,14 @@ $base64ptf = "iVBORw0KGgoAAAANSUhEUgAAALMAAAC8CAYAAAAzQp8mAAAAAXNSR0IArs4c6QAAAA
 $bytes = [System.Convert]::FromBase64String($base64ptf)
 Remove-Variable base64ptf
 
-$CompanyLogo = "$($csvsPath)'SOS_Logo.jpg')"
+$CompanyLogo = "$((Get-Item .).FullName)\PTF_Logo.jpg"
 $p = New-Object IO.MemoryStream($bytes, 0, $bytes.length)
 $p.Write($bytes, 0, $bytes.length)
 Add-Type -AssemblyName System.Drawing
 $picture = [System.Drawing.Image]::FromStream($p, $true)
 $picture.Save($CompanyLogo)
+
+
 
 Remove-Variable bytes
 Remove-Variable p
@@ -53,7 +89,7 @@ foreach ($csv in $csvs)
     $query = $worksheet.QueryTables.item($Connector.name)
 
     ### Set the delimiter (, or ;) according to your regional settings
-    $query.TextFileOtherDelimiter = $Excel.Application.International(5)
+    $query.TextFileOtherDelimiter = ","
 
     ### Set the format to delimited and text for every column
     ### A trick to create an array of 2s is used with the preceding comma
@@ -74,10 +110,15 @@ foreach ($csv in $csvs)
     $row = 3
     $column = 1
     $worksheet.Cells.Item($row,$column)= "                         $([io.path]::GetFileNameWithoutExtension("$inputCSV"))"
-    $worksheet.Cells.Item($row,$column).Style = "Accent4"
     $worksheet.Cells.Item($row,$column).Font.Size = 15
     $worksheet.Columns.Item(1).columnWidth = 50
 
+	Get-ExcelComObjRelease -ComObjtoRelease $worksheet
+	Get-ExcelComObjRelease -ComObjtoRelease $query
+	Get-ExcelComObjRelease -ComObjtoRelease $listObject
+	Get-ExcelComObjRelease -ComObjtoRelease $Connector
+	
+	
     $sheet++
 }
 
@@ -85,3 +126,5 @@ foreach ($csv in $csvs)
 ### Save & close the Workbook as XLSX. Change the output extension for Excel 2003
 $Workbook.SaveAs($outputXLSX,51)
 $excel.Quit()
+
+
