@@ -1442,6 +1442,111 @@ if(((Get-CSDeviceGuardStatus).SecurityServicesConfigured) -contains "HypervisorE
     Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
 }
 
+####################### RDP ###################################################
+$strSecurityItem = "Windows Services - RDP"
+$strSecurityItemCheck = "RDP should be disabled"
+Write-Host '#########################' -BackgroundColor Black
+Write-Host '##          RDP        ##' -BackgroundColor Black
+Write-Host '#########################' -BackgroundColor Black
+Write-Host 'Checking if RDP is disabled' -ForegroundColor Black -BackgroundColor White
+$regPath = "HKLM:\\System\CurrentControlSet\Control\Terminal Server\"
+$regPathProperty = "fDenyTSConnections"
+
+if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
+    $check = Get-ItemProperty -Path $regPath | Select-Object -ExpandProperty $regPathProperty -ErrorAction silentlycontinue
+    Switch($check)
+    {
+         '1' 
+         {
+            $strAuditCheckResult='RDP is disabled'
+            Write-Host $strAuditCheckResult -ForegroundColor Green
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+			
+
+         }
+         '0' 
+         {
+            $strAuditCheckResult='RDP is enabled'
+            Write-Host $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+			
+			### Check if TLS is enabled
+			# Security Layer 0 – With a low security level, the remote desktop protocol is used by the client for authentication prior to a remote desktop connection being established. Use this setting if you are working in an isolated environment.
+			# Security Layer 1 – With a medium security level, the server and client negotiate the method for authentication prior to a Remote Desktop connection being established. As this is the default value, use this setting only if all your machines are running Windows.
+			# Security Layer 2- With a high security level, Transport Layer Security, better knows as TLS is used by the server and client for authentication prior to a remote desktop connection being established. 
+			Write-Host 'Checking if RDP enforces the use of TLS' -ForegroundColor Black -BackgroundColor White
+			$strSecurityItemCheck = "RDP enforce the use of TLS"
+			$regPath = "HKLM:\\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp\"
+			$regPathProperty = "SecurityLayer"
+			
+			
+			if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
+				$secLayerValue= (Get-ItemProperty -Path $regPath | Select-Object -ExpandProperty $regPathProperty -ErrorAction silentlycontinue)
+				
+				if( $secLayerValue -eq 2){
+					$strAuditCheckResult="RDP service enforces the use of TLS upon connection"
+					Write-Host $strAuditCheckResult -ForegroundColor Green
+					Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+				} else {
+					$strAuditCheckResult="RDP service does not enforce the use of TLS upon connection"
+					Write-Host $strAuditCheckResult -ForegroundColor Red
+					Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+				}
+			} else {
+				$strAuditCheckResult="RDP service enforces the use of TLS upon connection"
+				Write-Host $strAuditCheckResult -ForegroundColor Green
+				Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+			}
+			
+			### Encryption level
+			# Security Layer 1 – With a low security level, communications sent from the client to the server are encrypted using 56-bit encryption. Data sent from the server to the client is not encrypted. This setting is not recommended as you can be exposed to various attacks.
+			# Security Layer 2 – Having a client compatible security level, communications between the server and the client are encrypted at the maximum key strength supported by the client. Use this level when the Terminal Server is running in an environment containing mixed or legacy clients as this is the default setting on your OS.
+			# Security Layer 3 – With a high security level, communications between server and client are encrypted using 128-bit encryption. Use this level when the clients that access the Terminal Server also support 128-bit encryption. If this option is set, clients that do not support 128-bit encryption will not be able to connect.
+			# Security Layer 4 – This security level is FIPS-Compliant, meaning that all communication between the server and client are encrypted and decrypted with the Federal Information Processing Standard (FIPS) encryption algorithms. Use this setting for maximum security but only if both machines support this type of encryption.
+			Write-Host 'Checking the encryption level enforced by RDP' -ForegroundColor Black -BackgroundColor White			
+			$strSecurityItemCheck = "Encryption level enforced by RDP"
+			$regPath = "HKLM:\\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp\"
+			$regPathProperty = "MinEncryptionLevel"
+			
+			
+			if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
+				$encryptionLevelValue= (Get-ItemProperty -Path $regPath | Select-Object -ExpandProperty $regPathProperty -ErrorAction silentlycontinue)
+				
+				if($encryptionLevelValue -eq 4){
+					$strAuditCheckResult="FIPS-Compliant, meaning that all communication between the server and client are encrypted and decrypted with the Federal Information Processing Standard (FIPS) encryption algorithms"
+					Write-Host $strAuditCheckResult -ForegroundColor Green
+					Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+				} elseif($encryptionLevelValue -eq 3){
+					$strAuditCheckResult="Communications between server and client are encrypted using 128-bit encryption"
+					Write-Host $strAuditCheckResult -ForegroundColor Red
+					Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+				} elseif($encryptionLevelValue -eq 2){
+					$strAuditCheckResult="Client compatible security level, communications between the server and the client are encrypted at the maximum key strength supported by the client"
+					Write-Host $strAuditCheckResult -ForegroundColor Red
+					Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+				} elseif($encryptionLevelValue -eq 1){
+					$strAuditCheckResult="Communications sent from the client to the server are encrypted using 56-bit encryption. Data sent from the server to the client is not encrypted."
+					Write-Host $strAuditCheckResult -ForegroundColor Red
+					Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+				} 
+				else {
+					$strAuditCheckResult="(Default) Client compatible security level, communications between the server and the client are encrypted at the maximum key strength supported by the client"
+					Write-Host $strAuditCheckResult -ForegroundColor Red
+					Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+				}
+			} else {
+				$strAuditCheckResult="RDP service enforces the use of TLS upon connection"
+				Write-Host $strAuditCheckResult -ForegroundColor Green
+				Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+			}	
+         }
+     }
+ } else {
+    $strSecurityItemCheck = "RDP should be disabled"
+	$strAuditCheckResult='RDP is disabled'
+    Write-Host $strAuditCheckResult -ForegroundColor Green
+    Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+ }
 
 
 ####################### Windows Firewall ###################################################
@@ -1504,7 +1609,7 @@ Get-NetFirewallRule | Select-Object -Property Name, DisplayName, DisplayGroup,
 Export-Csv -Path ".\CSV\Windows Firewall Rules.csv" -NoTypeInformation 
 
 ####################### LLMNR ###################################################
-$strSecurityItem = "DNS Spoofing - LLMNR"
+$strSecurityItem = "Man-in-the-Middle Attacks - LLMNR"
 $strSecurityItemCheck = "LLMNR should be disabled"
 Write-Host '#########################' -BackgroundColor Black
 Write-Host '##        LLMNR        ##' -BackgroundColor Black
@@ -1526,7 +1631,7 @@ if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
          '0' 
          {
             $strAuditCheckResult='LLMNR is disabled'
-            Write-Host $strAuditCheckResult -ForegroundColor Red
+            Write-Host $strAuditCheckResult -ForegroundColor Green
             Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
          }
      }
@@ -1538,7 +1643,7 @@ if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
 
 
  ####################### NBNS ###################################################
- $strSecurityItem = "DNS Spoofing - NBNS" #ToDo
+ $strSecurityItem = "Man-in-the-Middle Attacks - NBNS" #ToDo
  $strSecurityItemCheck = "NBNS should be disabled"
 Write-Host '#########################' -BackgroundColor Black
 Write-Host '##        NBNS         ##' -BackgroundColor Black
@@ -1560,6 +1665,80 @@ Write-Host '2 - NetBIOS is disabled' -ForegroundColor Green
 # $regkey = "HKLM:SYSTEM\CurrentControlSet\services\NetBT\Parameters\Interfaces"
 # Get-ChildItem $regkey |foreach { Set-ItemProperty -Path "$regkey\$($_.pschildname)" -Name NetbiosOptions -Value 2 -Verbose}
 # http://woshub.com/how-to-disable-netbios-over-tcpip-and-llmnr-using-gpo/#h2_4
+
+
+####################### WPAD ################################################# TODO
+## TODO #https://www.powershellgallery.com/packages/Get-InternetAccessInfo/0.2/Content/Get-InternetAccessInfo.psm1
+## Problem -> we run in context of an admin user and not a regular user... 
+### This check should be run as regular user
+$strSecurityItem = "Man-in-the-Middle Attacks - LLMNR"
+$strSecurityItemCheck = "WPAD should be disabled"
+Write-Host '#########################' -BackgroundColor Black
+Write-Host '##        WPAD         ##' -BackgroundColor Black
+Write-Host '#########################' -BackgroundColor Black
+Write-Host 'Check if WPAD is disabled' -ForegroundColor Black -BackgroundColor White
+$regPath = "HKLM:\\Software\Policies\Microsoft\Windows NT\DNSClient"
+$regPathProperty = "EnableMulticast"
+
+if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
+    $check = Get-ItemProperty -Path $regPath | Select-Object -ExpandProperty $regPathProperty -ErrorAction silentlycontinue
+    Switch($check)
+    {
+         '1' 
+         {
+            #$strAuditCheckResult='LLMNR is enabled'
+            #Write-Host $strAuditCheckResult -ForegroundColor Red
+            #Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+         }
+         '0' 
+         {
+            #$strAuditCheckResult='LLMNR is disabled'
+            #Write-Host $strAuditCheckResult -ForegroundColor Green
+            #Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+         }
+     }
+ } else {
+    #$strAuditCheckResult='LLMNR is disabled'
+    #Write-Host $strAuditCheckResult -ForegroundColor Red
+    #Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+ }
+
+
+####################### Logs ################################################# TODO
+<#
+Resources:
+    Get-EventLog: https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.management/get-eventlog?view=powershell-5.1
+    Recommended settings for event log sizes in Windows: https://support.microsoft.com/en-us/help/957662/recommended-settings-for-event-log-sizes-in-windows
+    Hey, Scripting Guy! How Can I Check the Size of My Event Log and Then Backup and Archive It If It Is More Than Half Full?: https://blogs.technet.microsoft.com/heyscriptingguy/2009/04/08/hey-scripting-guy-how-can-i-check-the-size-of-my-event-log-and-then-backup-and-archive-it-if-it-is-more-than-half-full/
+    Is there a log file for RDP connections?: https://social.technet.microsoft.com/Forums/en-US/cb1c904f-b542-4102-a8cb-e0c464249280/is-there-a-log-file-for-rdp-connections?forum=winserverTS
+    WINDOWS POWERSHELL LOGGING CHEAT SHEET - Win 7/Win 2008 or later: https://static1.squarespace.com/static/552092d5e4b0661088167e5c/t/5760096ecf80a129e0b17634/1465911664070/Windows+PowerShell+Logging+Cheat+Sheet+ver+June+2016+v2.pdf0
+#>
+$strSecurityItem = "Logging - Maximum Log Size"
+$strSecurityItemCheck = "Checking maximum log sizes"
+Write-Host '#####################################' -BackgroundColor Black
+Write-Host '##        Maximum Log Size         ##' -BackgroundColor Black
+Write-Host '#####################################' -BackgroundColor Black
+Write-Host $strSecurityItemCheck -ForegroundColor Black -BackgroundColor White
+
+Get-WmiObject -Class Win32_NTEventLogFile |
+	Select-Object LogfileName,
+				  Status,
+				  Name,
+				  NumberOfRecords,
+				  @{Name="FileSize in MB"; Expression={[math]::Round($_.FileSize / 1024 /1024) }}, 
+				  @{Name="MaxFileSize in MB"; Expression={[math]::Round($_.MaxFileSize / 1024 / 1024)}} |
+	Sort-Object -Property NumberOfRecords  -Descending |
+Format-Table -AutoSize
+
+Get-WmiObject -Class Win32_NTEventLogFile |
+	Select-Object LogfileName,
+				  Status,
+				  Name,
+				  NumberOfRecords,
+				  @{Name="FileSize in MB"; Expression={[math]::Round($_.FileSize / 1024 /1024) }}, 
+				  @{Name="MaxFileSize in MB"; Expression={[math]::Round($_.MaxFileSize / 1024 / 1024)}} |
+	Sort-Object -Property NumberOfRecords  -Descending |
+ Export-Csv -Path ".\CSV\Logging Overview.csv" -NoTypeInformation
 
 
 ####################### AV ###################################################
@@ -1720,11 +1899,10 @@ Get-Process -IncludeUserName | ForEach-Object {
     $Processes[$_.Id] = $_
 }
 
-
 # Query Listening TCP Daemons
 Write-Host "TCP Listening Services" -ForegroundColor Black -BackgroundColor White
 Get-NetTCPConnection | 
-    Where-Object { $_.LocalAddress -eq "0.0.0.0" -and $_.State -eq "Listen" } |
+    Where-Object { $_.State -eq "Listen" } |
     Select-Object LocalAddress,
         LocalPort,
         @{Name="PID";         Expression={ $_.OwningProcess }},
@@ -1735,7 +1913,7 @@ Get-NetTCPConnection |
     Format-Table -AutoSize
 
     Get-NetTCPConnection | 
-    Where-Object { $_.LocalAddress -eq "0.0.0.0" -and $_.State -eq "Listen" } |
+    Where-Object { $_.State -eq "Listen" } |
     Select-Object LocalAddress,
         LocalPort,
         @{Name="PID";         Expression={ $_.OwningProcess }},
@@ -1748,27 +1926,27 @@ Get-NetTCPConnection |
 # Query Listening UDP Daemons
 Write-Host "UDP Listening Services" -ForegroundColor Black -BackgroundColor White
 Get-NetUDPEndpoint | 
-    Where-Object { $_.LocalAddress -eq "0.0.0.0" } |
-    Select-Object LocalAddress,
-        LocalPort,
-        @{Name="PID";         Expression={ $_.OwningProcess }},
-        @{Name="UserName";    Expression={ $Processes[[int]$_.OwningProcess].UserName }},
-        @{Name="ProcessName"; Expression={ $Processes[[int]$_.OwningProcess].ProcessName }}, 
-        @{Name="Path"; Expression={ $Processes[[int]$_.OwningProcess].Path }} |
-    Sort-Object -Property LocalPort, UserName |
-    Format-Table -AutoSize
+	Where-Object { -not ($_.LocalAddress -eq "127.0.0.1") } |
+	Select-Object LocalAddress,
+		LocalPort,
+		@{Name="PID";         Expression={ $_.OwningProcess }},
+		@{Name="UserName";    Expression={ $Processes[[int]$_.OwningProcess].UserName }},
+		@{Name="ProcessName"; Expression={ $Processes[[int]$_.OwningProcess].ProcessName }}, 
+		@{Name="Path"; Expression={ $Processes[[int]$_.OwningProcess].Path }} |
+	Sort-Object -Property LocalPort, UserName |
+Format-Table -AutoSize
 
 
-    Write-Host "UDP Listening Services" -ForegroundColor Black -BackgroundColor White
-    Get-NetUDPEndpoint | 
-        Where-Object { $_.LocalAddress -eq "0.0.0.0" } |
-        Select-Object LocalAddress,
-            LocalPort,
-            @{Name="PID";         Expression={ $_.OwningProcess }},
-            @{Name="UserName";    Expression={ $Processes[[int]$_.OwningProcess].UserName }},
-            @{Name="ProcessName"; Expression={ $Processes[[int]$_.OwningProcess].ProcessName }}, 
-            @{Name="Path"; Expression={ $Processes[[int]$_.OwningProcess].Path }} |
-        Sort-Object -Property LocalPort, UserName | Export-Csv -Path ".\CSV\Network Services - UDP.csv" -NoTypeInformation 
+Write-Host "UDP Listening Services" -ForegroundColor Black -BackgroundColor White
+Get-NetUDPEndpoint | 
+	Where-Object { -not ($_.LocalAddress -eq "127.0.0.1") } |
+	Select-Object LocalAddress,
+		LocalPort,
+		@{Name="PID";         Expression={ $_.OwningProcess }},
+		@{Name="UserName";    Expression={ $Processes[[int]$_.OwningProcess].UserName }},
+		@{Name="ProcessName"; Expression={ $Processes[[int]$_.OwningProcess].ProcessName }}, 
+		@{Name="Path"; Expression={ $Processes[[int]$_.OwningProcess].Path }} |
+	Sort-Object -Property LocalPort, UserName | Export-Csv -Path ".\CSV\Network Services - UDP.csv" -NoTypeInformation 
 
 
 ####################### Local Users ###################################################
