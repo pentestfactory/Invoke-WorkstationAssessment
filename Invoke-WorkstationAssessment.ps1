@@ -2456,7 +2456,6 @@ Format-Table -AutoSize -Wrap
 
 # Export all services to CSV
 Get-WmiObject win32_service | 
-	Where-Object {($_.state -match 'running')} | 
 	Select-Object Name,
 		DisplayName,
 		StartName,
