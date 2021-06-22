@@ -2465,7 +2465,7 @@ Get-WmiObject win32_service |
         @{Name="UserName";    Expression={ $Processes[[int]$_.ProcessID].UserName }},
         @{Name="ProcessName"; Expression={ $Processes[[int]$_.ProcessID].ProcessName }}, 
         @{Name="Path"; Expression={ $Processes[[int]$_.ProcessID].Path }} | 
-| Export-Csv -Path ".\CSV\Windows Services.csv" -NoTypeInformation
+Export-Csv -Path ".\CSV\Windows Services.csv" -NoTypeInformation
 
 
 ####################### CIS-Hardening ###################################################
