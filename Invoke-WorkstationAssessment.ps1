@@ -1473,7 +1473,7 @@ if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
 			### Check if TLS is enabled
 			# Security Layer 0 – With a low security level, the remote desktop protocol is used by the client for authentication prior to a remote desktop connection being established. Use this setting if you are working in an isolated environment.
 			# Security Layer 1 – With a medium security level, the server and client negotiate the method for authentication prior to a Remote Desktop connection being established. As this is the default value, use this setting only if all your machines are running Windows.
-			# Security Layer 2- With a high security level, Transport Layer Security, better knows as TLS is used by the server and client for authentication prior to a remote desktop connection being established. 
+			# Security Layer 2 - With a high security level, Transport Layer Security, better knows as TLS is used by the server and client for authentication prior to a remote desktop connection being established. 
 			Write-Host 'Checking if RDP enforces the use of TLS' -ForegroundColor Black -BackgroundColor White
 			$strSecurityItemCheck = "RDP enforce the use of TLS"
 			$regPath = "HKLM:\\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp\"
@@ -1483,17 +1483,42 @@ if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
 			if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
 				$secLayerValue= (Get-ItemProperty -Path $regPath | Select-Object -ExpandProperty $regPathProperty -ErrorAction silentlycontinue)
 				
-				if( $secLayerValue -eq 2){
-					$strAuditCheckResult="RDP service enforces the use of TLS upon connection"
+				if($secLayerValue -eq 2){
+					$strAuditCheckResult="RDP service enforces the use of TLS"
 					Write-Host $strAuditCheckResult -ForegroundColor Green
 					Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
 				} else {
-					$strAuditCheckResult="RDP service does not enforce the use of TLS upon connection"
+					$strAuditCheckResult="RDP service does not enforce the use of TLS"
 					Write-Host $strAuditCheckResult -ForegroundColor Red
 					Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
 				}
 			} else {
-				$strAuditCheckResult="RDP service enforces the use of TLS upon connection"
+				$strAuditCheckResult="(Default) RDP service enforces the use of TLS upon connection"
+				Write-Host $strAuditCheckResult -ForegroundColor Green
+				Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+			}
+			
+			### Check if NLA is enabled
+			# UserAuthentication 1 -> NLA active
+			# UserAuthentication 0 -> NLA not active
+			Write-Host 'Checking if RDP enforces the use of NLA' -ForegroundColor Black -BackgroundColor White
+			$strSecurityItemCheck = "RDP enforce the use of NLA"
+			$regPath = "HKLM:\\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp\"
+			$regPathProperty = "UserAuthentication"
+			if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
+				$secLayerValue= (Get-ItemProperty -Path $regPath | Select-Object -ExpandProperty $regPathProperty -ErrorAction silentlycontinue)
+				
+				if($secLayerValue -eq 1){
+					$strAuditCheckResult="RDP service enforces the use of Network Level Authentication (NLA)"
+					Write-Host $strAuditCheckResult -ForegroundColor Green
+					Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+				} else {
+					$strAuditCheckResult="RDP service does not enforce the use of Network Level Authentication (NLA)"
+					Write-Host $strAuditCheckResult -ForegroundColor Red
+					Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+				}
+			} else {
+				$strAuditCheckResult="(Default) RDP service enforces the use of NLA upon connection"
 				Write-Host $strAuditCheckResult -ForegroundColor Green
 				Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
 			}
@@ -2397,13 +2422,50 @@ Write-Host '#################################' -BackgroundColor Black
 Write-Host '##          Services           ##' -BackgroundColor Black
 Write-Host '#################################' -BackgroundColor Black
 Write-Host 'Enumerating running services' -ForegroundColor Black -BackgroundColor White
-Get-WmiObject win32_service | ? {($_.state -match 'running')} | Sort-Object DisplayName | Format-Table Name, DisplayName, StartName, state, ProcessID -AutoSize -Wrap
+
+$Processes = @{}
+Get-Process -IncludeUserName | ForEach-Object {
+    $Processes[$_.Id] = $_
+}
+
+# Running services
+Get-WmiObject win32_service | 
+	Where-Object {($_.state -match 'running')} | 
+	Select-Object Name,
+		DisplayName,
+		StartName,
+		state,
+		ProcessID,
+        @{Name="UserName";    Expression={ $Processes[[int]$_.ProcessID].UserName }},
+        @{Name="ProcessName"; Expression={ $Processes[[int]$_.ProcessID].ProcessName }}, 
+        @{Name="Path"; Expression={ $Processes[[int]$_.ProcessID].Path }} | 
+	Sort-Object DisplayName |
+Format-Table -AutoSize -Wrap
+
+# Stopped services
 Write-Host 'Enumerating stopped services' -ForegroundColor Black -BackgroundColor White
-Get-WmiObject win32_service | ? {-not ($_.state -match 'running')} | Sort-Object DisplayName | Format-Table Name, DisplayName, StartName, state, ProcessID -AutoSize -Wrap
-Get-WmiObject win32_service | Sort-Object DisplayName | Select-Object Name, DisplayName, StartName, state, ProcessID | Export-Csv -Path ".\CSV\Windows Services.csv" -NoTypeInformation
-# TODO
-# Registry Auditing for Credential Theft - https://medium.com/threatpunter/detecting-attempts-to-steal-passwords-from-the-registry-7512674487f8
-# 
+Get-WmiObject win32_service | 
+	Where-Object {-not ($_.state -match 'running')} | 
+	Select-Object Name,
+		DisplayName,
+		StartName,
+		state | 
+	Sort-Object DisplayName |
+Format-Table -AutoSize -Wrap
+
+
+# Export all services to CSV
+Get-WmiObject win32_service | 
+	Where-Object {($_.state -match 'running')} | 
+	Select-Object Name,
+		DisplayName,
+		StartName,
+		state,
+		ProcessID,
+        @{Name="UserName";    Expression={ $Processes[[int]$_.ProcessID].UserName }},
+        @{Name="ProcessName"; Expression={ $Processes[[int]$_.ProcessID].ProcessName }}, 
+        @{Name="Path"; Expression={ $Processes[[int]$_.ProcessID].Path }} | 
+| Export-Csv -Path ".\CSV\Windows Services.csv" -NoTypeInformation
 
 
 ####################### CIS-Hardening ###################################################
