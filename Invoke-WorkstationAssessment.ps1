@@ -945,7 +945,7 @@ function Add-SecurityCheckItem {
             Passed = $AuditCheckPass
         } 
     
-       $Global:SecurityItemAuditResults += New-Object PSObject -Property $auditDetails
+       [array]$Global:SecurityItemAuditResults += New-Object PSObject -Property $auditDetails
     }
     
 $path = ".\CSV"
