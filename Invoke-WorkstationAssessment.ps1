@@ -2474,12 +2474,12 @@ Write-Host '#################################' -BackgroundColor Black
 $path = ".\HardeningKitty"
 If(!(test-path $path))
 {
-    Invoke-WebRequest -Uri "https://github.com/scipag/HardeningKitty/archive/refs/heads/master.zip" -OutFile ".\HardeningKitty.zip"
+    Invoke-WebRequest -Uri "https://github.com/strakuscrafter/HardeningKitty/archive/refs/heads/master.zip" -OutFile ".\HardeningKitty.zip"
     Expand-Archive -Path ".\HardeningKitty.zip"
 }
 
 Import-Module ".\HardeningKitty\HardeningKitty-master\Invoke-HardeningKitty.ps1"
-Invoke-HardeningKitty -FileFindingList ".\HardeningKitty\HardeningKitty-master\lists\finding_list_cis_microsoft_windows_10_enterprise_20h2_machine.csv" -SkipMachineInformation -Report "Audit" -ReportFile ".\CSV\Hardening CIS.csv"
+Invoke-HardeningKitty -FileFindingList ".\HardeningKitty\HardeningKitty-master\newLists\Windows10_20H2_FinalCSV(german).csv" -SkipMachineInformation -Report "Audit" -ReportFile ".\CSV\Hardening CIS.csv"
 
 ####################### Important-Hardening Overview ###################################################
 Write-Host '###########################################' -BackgroundColor Black
