@@ -1781,7 +1781,7 @@ if(-not ($defenderPreferences.DisableRealtimeMonitoring)){
     Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
  } else {
     $strAuditCheckResult='Defender is not active'
-    Write-Host $strAuditCheckResult -ForegroundColor Green
+    Write-Host $strAuditCheckResult -ForegroundColor Red
     Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
  }
 ####################### Windows Installer ###################################################
