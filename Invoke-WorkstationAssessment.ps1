@@ -1,6 +1,10 @@
-
 Install-Module -Name PoshPrivilege -Force
 Import-Module PoshPrivilege
+
+$ErrorActionPreference="SilentlyContinue"
+Stop-Transcript | out-null
+$ErrorActionPreference = "Continue"
+Start-Transcript -path ".\Invoke-WorkstatationAssessment.log" -append
 
 Function Get-BadPrivilege
 {
@@ -2957,3 +2961,5 @@ Write-Host '##   Important-Hardening Overview        ##' -BackgroundColor Black
 Write-Host '###########################################' -BackgroundColor Black
 $SecurityItemAuditResults | Sort-Object SecurityItem | Format-Table SecurityItem, check, result, passed
 $SecurityItemAuditResults | Sort-Object SecurityItem, Check | Select-Object SecurityItem, check, result, passed | Export-Csv  -Path ".\CSV\Important Hardening.csv" -NoTypeInformation
+
+Stop-Transcript
