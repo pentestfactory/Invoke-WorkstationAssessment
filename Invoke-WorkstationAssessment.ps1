@@ -2120,6 +2120,9 @@ if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
  }
 
 
+
+
+
  ####################### Anonymous enumeration of SAM accounts should not be allowed. ###################################################
 $strSecurityItem = "SMB Security"
 $strSecurityItemCheck = "Anonymous enumeration of SAM accounts should not be allowed."
@@ -2371,6 +2374,400 @@ if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
     $strAuditCheckResult='SMB-Signing is not enforced and can be downgraded (Server)'
     Write-Host $strAuditCheckResult -ForegroundColor Red
     Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+ }
+
+
+####################### UAC Settings ###################################################
+$strSecurityItem = "UAC Security"
+$strSecurityItemCheck = "User Account Control: Admin Approval Mode for the built-in Administrator account"
+Write-Host '#####################################################################################' -BackgroundColor Black
+Write-Host '##    UAC Security - Admin Approval Mode for the built-in Administrator account    ##' -BackgroundColor Black
+Write-Host '#####################################################################################' -BackgroundColor Black
+Write-Host 'Checking Admin Approval Mode for the built-in Administrator account' -ForegroundColor Black -BackgroundColor White
+
+$regPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\"
+$regPathProperty = "FilterAdministratorToken"
+
+if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
+    $check = Get-ItemProperty -Path $regPath | Select-Object -ExpandProperty $regPathProperty -ErrorAction silentlycontinue
+    Switch($check)
+    {
+         '1' 
+         {
+            $strAuditCheckResult='Admin Approval Mode for the built-in Administrator account is enabled'
+            Write-Host  $strAuditCheckResult -ForegroundColor Green
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+
+         }
+         '0' 
+         {
+            $strAuditCheckResult='Admin Approval Mode for the built-in Administrator account is disabled'
+            Write-Host $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+         }
+     }
+ } else {
+        $strAuditCheckResult='Admin Approval Mode for the built-in Administrator account is disabled'
+        Write-Host $strAuditCheckResult -ForegroundColor Red
+        Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+ }
+
+
+ ####################### UAC Settings ###################################################
+ # https://docs.microsoft.com/en-us/windows/security/identity-protection/user-account-control/user-account-control-group-policy-and-registry-key-settings
+$strSecurityItem = "UAC Security"
+$strSecurityItemCheck = "User Account Control: Allow UIAccess applications to prompt for elevation without using the secure desktop"
+Write-Host '###############################################################################################################' -BackgroundColor Black
+Write-Host '##    UAC Security - Allow UIAccess applications to prompt for elevation without using the secure desktop    ##' -BackgroundColor Black
+Write-Host '###############################################################################################################' -BackgroundColor Black
+Write-Host 'Checking Allow UIAccess applications to prompt for elevation without using the secure desktop' -ForegroundColor Black -BackgroundColor White
+
+$regPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\"
+$regPathProperty = "EnableUIADesktopToggle"
+
+if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
+    $check = Get-ItemProperty -Path $regPath | Select-Object -ExpandProperty $regPathProperty -ErrorAction silentlycontinue
+    Switch($check)
+    {
+         '1' 
+         {
+            $strAuditCheckResult='Allow UIAccess applications to prompt for elevation without using the secure desktop is enabled'
+            Write-Host  $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+
+         }
+         '0' 
+         {
+            $strAuditCheckResult='Allow UIAccess applications to prompt for elevation without using the secure desktop is disabled'
+            Write-Host $strAuditCheckResult -ForegroundColor Green
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+         }
+     }
+ } else {
+        $strAuditCheckResult='Allow UIAccess applications to prompt for elevation without using the secure desktop is disabled'
+        Write-Host $strAuditCheckResult -ForegroundColor Green
+        Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+ }
+
+
+####################### UAC Settings ###################################################
+$strSecurityItem = "UAC Security"
+$strSecurityItemCheck = "User Account Control: Behavior of the elevation prompt for administrators in Admin Approval Mode"
+Write-Host '#####################################################################################################' -BackgroundColor Black
+Write-Host '##    UAC Security - Behavior of the elevation prompt for administrators in Admin Approval Mode    ##' -BackgroundColor Black
+Write-Host '#####################################################################################################' -BackgroundColor Black
+Write-Host 'Checking Behavior of the elevation prompt for administrators in Admin Approval Mode' -ForegroundColor Black -BackgroundColor White
+
+$regPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\"
+$regPathProperty = "ConsentPromptBehaviorAdmin"
+
+if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
+    $check = Get-ItemProperty -Path $regPath | Select-Object -ExpandProperty $regPathProperty -ErrorAction silentlycontinue
+    Switch($check)
+    {
+         '0' 
+         {
+            $strAuditCheckResult='Elevate without prompting'
+            Write-Host $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+         }
+
+         '1' 
+         {
+            $strAuditCheckResult='Prompt for credentials on the secure desktop'
+            Write-Host  $strAuditCheckResult -ForegroundColor Green
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+
+         }
+         '2' 
+         {
+            $strAuditCheckResult='Prompt for consent on the secure desktop'
+            Write-Host  $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+
+         }
+         '3' 
+         {
+            $strAuditCheckResult='Prompt for credentials without secure desktop'
+            Write-Host  $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+
+         }
+         '4' 
+         {
+            $strAuditCheckResult='Prompt for consent without secure desktop'
+            Write-Host  $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+
+         }
+         '5' 
+         {
+            $strAuditCheckResult='Prompt for consent for non-Windows binaries'
+            Write-Host  $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+
+         }
+     }
+ } else {
+        $strAuditCheckResult='(Default) Prompt for consent for non-Windows binaries'
+        Write-Host $strAuditCheckResult -ForegroundColor Red
+        Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+ }
+
+
+ ####################### UAC Settings ###################################################
+$strSecurityItem = "UAC Security"
+$strSecurityItemCheck = "User Account Control: Behavior of the elevation prompt for standard users"
+Write-Host '################################################################################' -BackgroundColor Black
+Write-Host '##    UAC Security - Behavior of the elevation prompt for standard users      ##' -BackgroundColor Black
+Write-Host '################################################################################' -BackgroundColor Black
+Write-Host 'Checking Behavior of the elevation prompt for standard users' -ForegroundColor Black -BackgroundColor White
+
+$regPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\"
+$regPathProperty = "ConsentPromptBehaviorUser"
+
+if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
+    $check = Get-ItemProperty -Path $regPath | Select-Object -ExpandProperty $regPathProperty -ErrorAction silentlycontinue
+    Switch($check)
+    {
+         '0' 
+         {
+            $strAuditCheckResult='Automatically deny elevation requests'
+            Write-Host $strAuditCheckResult -ForegroundColor Green
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+         }
+
+         '1' 
+         {
+            $strAuditCheckResult='Prompt for credentials on the secure desktop'
+            Write-Host  $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+
+         }
+         '3' 
+         {
+            $strAuditCheckResult='Prompt for credentials without secure desktop'
+            Write-Host  $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+
+         }
+     }
+ } else {
+        $strAuditCheckResult='(Default) Prompt for credentials without secure desktop'
+        Write-Host $strAuditCheckResult -ForegroundColor Red
+        Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+ }
+
+####################### UAC Settings ###################################################
+$strSecurityItem = "UAC Security"
+$strSecurityItemCheck = "User Account Control: Detect application installations and prompt for elevation"
+Write-Host '#####################################################################################' -BackgroundColor Black
+Write-Host '##    UAC Security - Detect application installations and prompt for elevation     ##' -BackgroundColor Black
+Write-Host '#####################################################################################' -BackgroundColor Black
+Write-Host 'Checking: User Account Control - Detect application installations and prompt for elevation' -ForegroundColor Black -BackgroundColor White
+
+$regPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\"
+$regPathProperty = "EnableInstallerDetection"
+
+if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
+    $check = Get-ItemProperty -Path $regPath | Select-Object -ExpandProperty $regPathProperty -ErrorAction silentlycontinue
+    Switch($check)
+    {
+         '1' 
+         {
+            $strAuditCheckResult='Detect application installations and prompt for elevation is enabled'
+            Write-Host  $strAuditCheckResult -ForegroundColor Green
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+
+         }
+         '0' 
+         {
+            $strAuditCheckResult='Detect application installations and prompt for elevation is disabled'
+            Write-Host $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+         }
+     }
+ } else {
+        $strAuditCheckResult='(Default) Detect application installations and prompt for elevation is disabled for Home Versions or Enabled for Enterprise Versions'
+        Write-Host $strAuditCheckResult -ForegroundColor Red
+        Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+ }
+
+ ####################### UAC Settings ###################################################
+$strSecurityItem = "UAC Security"
+$strSecurityItemCheck = "Only elevate executables that are signed and validated"
+Write-Host '#####################################################################################' -BackgroundColor Black
+Write-Host '##    UAC Security - Only elevate executables that are signed and validated        ##' -BackgroundColor Black
+Write-Host '#####################################################################################' -BackgroundColor Black
+Write-Host 'Checking: UAC - Only elevate executables that are signed and validated' -ForegroundColor Black -BackgroundColor White
+
+$regPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\"
+$regPathProperty = "ValidateAdminCodeSignatures"
+
+if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
+    $check = Get-ItemProperty -Path $regPath | Select-Object -ExpandProperty $regPathProperty -ErrorAction silentlycontinue
+    Switch($check)
+    {
+         '1' 
+         {
+            $strAuditCheckResult='Only elevate executables that are signed and validated is enabled'
+            Write-Host  $strAuditCheckResult -ForegroundColor Green
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+
+         }
+         '0' 
+         {
+            $strAuditCheckResult='Only elevate executables that are signed and validated is disabled'
+            Write-Host $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+         }
+     }
+ } else {
+        $strAuditCheckResult='(Default) Only elevate executables that are signed and validated is disabled'
+        Write-Host $strAuditCheckResult -ForegroundColor Red
+        Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+ }
+
+ ####################### UAC Settings ###################################################
+$strSecurityItem = "UAC Security"
+$strSecurityItemCheck = "User Account Control: Only elevate UIAccess applications that are installed in secure locations"
+Write-Host '####################################################################################################' -BackgroundColor Black
+Write-Host '##    UAC Security - Only elevate UIAccess applications that are installed in secure locations    ##' -BackgroundColor Black
+Write-Host '####################################################################################################' -BackgroundColor Black
+Write-Host 'Checking: User Account Control: Only elevate UIAccess applications that are installed in secure locations' -ForegroundColor Black -BackgroundColor White
+
+$regPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\"
+$regPathProperty = "EnableSecureUIAPaths"
+
+if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
+    $check = Get-ItemProperty -Path $regPath | Select-Object -ExpandProperty $regPathProperty -ErrorAction silentlycontinue
+    Switch($check)
+    {
+         '1' 
+         {
+            $strAuditCheckResult='Only elevate UIAccess applications that are installed in secure locations is enabled'
+            Write-Host  $strAuditCheckResult -ForegroundColor Green
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+
+         }
+         '0' 
+         {
+            $strAuditCheckResult='Only elevate UIAccess applications that are installed in secure locations is disabled'
+            Write-Host $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+         }
+     }
+ } else {
+        $strAuditCheckResult='(Default) Only elevate UIAccess applications that are installed in secure locations is enabled'
+        Write-Host $strAuditCheckResult -ForegroundColor Red
+        Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+ }
+
+  ####################### UAC Settings ###################################################
+$strSecurityItem = "UAC Security"
+$strSecurityItemCheck = "User Account Control: Run all administrators in Admin Approval Mode"
+Write-Host '###############################################################################################' -BackgroundColor Black
+Write-Host '##    UAC Security - Run all administrators in Admin Approval Mode aka. UAC turned on        ##' -BackgroundColor Black
+Write-Host '###############################################################################################' -BackgroundColor Black
+Write-Host 'Checking: UAC - Run all administrators in Admin Approval Mode aka. UAC turned on' -ForegroundColor Black -BackgroundColor White
+
+$regPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\"
+$regPathProperty = "EnableLUA"
+
+if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
+    $check = Get-ItemProperty -Path $regPath | Select-Object -ExpandProperty $regPathProperty -ErrorAction silentlycontinue
+    Switch($check)
+    {
+         '1' 
+         {
+            $strAuditCheckResult='Run all administrators in Admin Approval Mode aka. UAC turned on is enabled'
+            Write-Host  $strAuditCheckResult -ForegroundColor Green
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+
+         }
+         '0' 
+         {
+            $strAuditCheckResult='Run all administrators in Admin Approval Mode aka. UAC turned on is disabled'
+            Write-Host $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+         }
+     }
+ } else {
+        $strAuditCheckResult='(Default) Run all administrators in Admin Approval Mode aka. UAC turned on is enabled'
+        Write-Host $strAuditCheckResult -ForegroundColor Green
+        Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+ }
+
+
+  ####################### UAC Settings ###################################################
+$strSecurityItem = "UAC Security"
+$strSecurityItemCheck = "User Account Control: Switch to the secure desktop when prompting for elevation"
+Write-Host '#####################################################################################' -BackgroundColor Black
+Write-Host '##    UAC Security - Switch to the secure desktop when prompting for elevation        ##' -BackgroundColor Black
+Write-Host '#####################################################################################' -BackgroundColor Black
+Write-Host 'Checking: UAC - Switch to the secure desktop when prompting for elevation' -ForegroundColor Black -BackgroundColor White
+
+$regPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\"
+$regPathProperty = "PromptOnSecureDesktop"
+
+if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
+    $check = Get-ItemProperty -Path $regPath | Select-Object -ExpandProperty $regPathProperty -ErrorAction silentlycontinue
+    Switch($check)
+    {
+         '1' 
+         {
+            $strAuditCheckResult='Switch to the secure desktop when prompting for elevation is enabled'
+            Write-Host  $strAuditCheckResult -ForegroundColor Green
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+
+         }
+         '0' 
+         {
+            $strAuditCheckResult='Switch to the secure desktop when prompting for elevation is disabled'
+            Write-Host $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+         }
+     }
+ } else {
+        $strAuditCheckResult='(Default) Switch to the secure desktop when prompting for elevation is enabled'
+        Write-Host $strAuditCheckResult -ForegroundColor Red
+        Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+ }
+
+
+####################### UAC Settings ###################################################
+$strSecurityItem = "UAC Security"
+$strSecurityItemCheck = "User Account Control: Virtualize file and registry write failures to per-user locations"
+Write-Host '################################################################################################' -BackgroundColor Black
+Write-Host '##    UAC Security - Virtualize file and registry write failures to per-user locations        ##' -BackgroundColor Black
+Write-Host '################################################################################################' -BackgroundColor Black
+Write-Host 'Checking: UAC - Virtualize file and registry write failures to per-user locations' -ForegroundColor Black -BackgroundColor White
+
+$regPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\"
+$regPathProperty = "EnableVirtualization"
+
+if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
+    $check = Get-ItemProperty -Path $regPath | Select-Object -ExpandProperty $regPathProperty -ErrorAction silentlycontinue
+    Switch($check)
+    {
+         '1' 
+         {
+            $strAuditCheckResult='Virtualize file and registry write failures to per-user locations is enabled'
+            Write-Host  $strAuditCheckResult -ForegroundColor Green
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+
+         }
+         '0' 
+         {
+            $strAuditCheckResult='Virtualize file and registry write failures to per-user locations is disabled'
+            Write-Host $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+         }
+     }
+ } else {
+        $strAuditCheckResult='(Default) Virtualize file and registry write failures to per-user locations is enabled'
+        Write-Host $strAuditCheckResult -ForegroundColor Red
+        Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
  }
 
 ####################### User Rights Assignment ###################################################
