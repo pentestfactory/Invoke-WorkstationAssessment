@@ -2672,7 +2672,7 @@ if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
 
  ####################### UAC Settings ###################################################
 $strSecurityItem = "UAC Security"
-$strSecurityItemCheck = "Only elevate executables that are signed and validated"
+$strSecurityItemCheck = "User Account Control: Only elevate executables that are signed and validated"
 Write-Host '#####################################################################################' -BackgroundColor Black
 Write-Host '##    UAC Security - Only elevate executables that are signed and validated        ##' -BackgroundColor Black
 Write-Host '#####################################################################################' -BackgroundColor Black
