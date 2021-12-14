@@ -1,4 +1,77 @@
 
+Install-Module -Name PoshPrivilege -Force
+Import-Module PoshPrivilege
+
+Function Get-BadPrivilege
+{
+
+    # Check if Get-Privilege has bee loaded
+    $CheckFunc = Test-Path Function:\Get-Privilege
+    If(-not $CheckFunc){
+        Write-Output "The Get-Privilege function does not appear to be available."
+        Write-Output "It can be downloaded from https://github.com/proxb/PoshPrivilege."
+        Write-Output "Aborting run."
+        break
+    }
+
+    # Check if the current user is an administrator
+    $CheckAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
+    If(-not $CheckAdmin){
+        Write-Output "This script must be run as a local adminsitrator."  
+        Write-Output "Aborting run."  
+        break
+    }
+
+    # Create a table of known high risk rights/privileges
+    $BadPrivileges = New-Object System.Collections.Arraylist
+    $null = $BadPrivileges.Add("SeImpersonatePrivilege")
+    $null = $BadPrivileges.Add("SeAssignPrimaryPrivilege")
+    $null = $BadPrivileges.Add("SeTcbPrivilege")
+    $null = $BadPrivileges.Add("SeBackupPrivilege")
+    $null = $BadPrivileges.Add("SeRestorePrivilege")
+    $null = $BadPrivileges.Add("SeCreateTokenPrivilege")
+    $null = $BadPrivileges.Add("SeLoadDriverPrivilege")
+    $null = $BadPrivileges.Add("SeTakeOwnershipPrivilege")
+    $null = $BadPrivileges.Add("SeDebugPrivilege")
+
+    # Iterate through identified right/privilege assignments
+    Get-Privilege | 
+    ForEach-Object{
+
+        # Get privilege information
+        $MyComputerName     = $_.ComputerName
+        $MyPrivilege        = $_.Privilege
+        $MyDescription      = $_.Description
+        $MyAffectedAccounts = $_.Accounts  
+
+        # Check if the privilege is high risk
+        $BadPrivileges | 
+        ForEach-Object{                                   
+            if ($_ -like "$MyPrivilege*")
+            {          
+                $MyRiskStatus = "Yes"
+            }else{
+                $MyRiskStatus = "No"
+            }
+        }
+
+        # Parse affected accounts
+        $MyAffectedAccounts | 
+        ForEach-Object{
+
+            $myObject = [PSCustomObject]@{
+                ComputerName     = [string]$MyComputerName
+                Privilege        = [string]$MyPrivilege
+                HighRisk         = [string]$MyRiskStatus
+                Description      = [string]$MyDescription
+                User             = [string]$_           
+            }  
+        
+            $myObject                    
+        }        
+    }
+}
+
 function Get-ScheduledTasks {  
     <#
     .SYNOPSIS
@@ -2775,11 +2848,11 @@ if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
  Write-Host '##   User Rights Assignment    ##' -BackgroundColor Black
  Write-Host '#################################' -BackgroundColor Black
  Write-Host 'Enumerating User Rights Assignment' -ForegroundColor Black -BackgroundColor White
- Get-UserRightsAssignment | Sort-Object -Property PrivilegeName | Format-Table 
- Get-UserRightsAssignment | Sort-Object -Property PrivilegeName | Export-Csv -Path ".\CSV\User Rights Assignment.csv" -NoTypeInformation
+Get-BadPrivilege | Sort-Object -Property HighRisk, Privilege -Descending | Format-Table
+Get-BadPrivilege | Sort-Object -Property HighRisk, Privilege -Descending | Export-Csv -Path ".\CSV\User Rights Assignment.csv" -NoTypeInformation
 
 
- ####################### Bitlocker ###################################################
+####################### Bitlocker ###################################################
 Write-Host '#################################' -BackgroundColor Black
 Write-Host '##         Bitlocker           ##' -BackgroundColor Black
 Write-Host '#################################' -BackgroundColor Black
