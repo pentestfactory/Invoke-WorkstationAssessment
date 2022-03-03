@@ -17,15 +17,21 @@ Write-Host '#########################' -BackgroundColor Black
 Write-Host '## Running PowerUp      ##' -BackgroundColor Black
 Write-Host '#########################' -BackgroundColor Black
 Write-Host 'Running PowerUp and saving HTML output' -ForegroundColor Black -BackgroundColor White
+mkdir PowerUp
+cd PowerUp
 iex(New-Object Net.WebClient).DownloadString("https://github.com/PowerShellMafia/PowerSploit/raw/master/Privesc/PowerUp.ps1")
 Invoke-PrivescAudit -ErrorAction SilentlyContinue -HTMLReport
+cd ..
 
 Write-Host '######################################' -BackgroundColor Black
 Write-Host '## Running Invoke-PrivescCheck      ##' -BackgroundColor Black
 Write-Host '######################################' -BackgroundColor Black
 Write-Host 'Running Invoke-PrivescCheck and saving HTML output' -ForegroundColor Black -BackgroundColor White
+mkdir Invoke-PrivEscCheck
+cd Invoke-PrivEscCheck
 iex(New-Object Net.WebClient).DownloadString("https://github.com/itm4n/PrivescCheck/raw/master/PrivescCheck.ps1")
 Invoke-PrivescCheck -Report PrivescCheck_$env:computername -Format TXT,CSV,HTML,XML -Extended
+cd ..
 
 Write-Host '######################################' -BackgroundColor Black
 Write-Host '## Running WinPeas                  ##' -BackgroundColor Black
@@ -33,6 +39,10 @@ Write-Host '######################################' -BackgroundColor Black
 Write-Host 'Running WinPeas and saving output' -ForegroundColor Black -BackgroundColor White
 # Get latest release
 $currentPath=(Get-Location).Path
+mkdir WinPEAS
+cd WinPEAS
 $url = "https://github.com/carlospolop/PEASS-ng/releases/latest/download/winPEASany_ofs.exe"
 wget $url -OutFile $currentPath/winPEASx64.exe
 ./winPEASx64.exe log
+cd ..
+
