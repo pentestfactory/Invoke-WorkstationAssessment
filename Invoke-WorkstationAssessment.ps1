@@ -2976,6 +2976,7 @@ Get-WmiObject win32_service |
 Format-Table -AutoSize -Wrap
 
 
+
 # Export all services to CSV
 Get-WmiObject win32_service | 
 	Select-Object Name,
@@ -3009,5 +3010,11 @@ Write-Host '##   Important-Hardening Overview        ##' -BackgroundColor Black
 Write-Host '###########################################' -BackgroundColor Black
 $SecurityItemAuditResults | Sort-Object SecurityItem | Format-Table SecurityItem, check, result, passed
 $SecurityItemAuditResults | Sort-Object SecurityItem, Check | Select-Object SecurityItem, check, result, passed | Export-Csv  -Path ".\CSV\Important Hardening.csv" -NoTypeInformation
+
+####################### Defender Exclusions         ###########################
+Write-Host '###########################################' -BackgroundColor Black
+Write-Host '##   Defender Exclusions                 ##' -BackgroundColor Black
+Write-Host '###########################################' -BackgroundColor Black
+Get-MpPreference | Select-Object -ExpandProperty ExclusionPath
 
 Stop-Transcript
