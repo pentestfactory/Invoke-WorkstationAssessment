@@ -20,34 +20,6 @@ Write-Host 'Adding the current folder to the defender exclusion list' -Foregroun
 $currentPath=(Get-Location).Path
 Add-MpPreference -ExclusionPath $currentPath
 
-Write-Host '#########################' -BackgroundColor Black
-Write-Host '## Running PowerUp      ##' -BackgroundColor Black
-Write-Host '#########################' -BackgroundColor Black
-Write-Host 'Running PowerUp and saving HTML output' -ForegroundColor Black -BackgroundColor White
-iex(New-Object Net.WebClient).DownloadString("https://github.com/PowerShellMafia/PowerSploit/raw/master/Privesc/PowerUp.ps1")
-Invoke-PrivescAudit -ErrorAction SilentlyContinue -HTMLReport
-
-Write-Host '######################################' -BackgroundColor Black
-Write-Host '## Running Invoke-PrivescCheck      ##' -BackgroundColor Black
-Write-Host '######################################' -BackgroundColor Black
-Write-Host 'Running Invoke-PrivescCheck and saving HTML output' -ForegroundColor Black -BackgroundColor White
-iex(New-Object Net.WebClient).DownloadString("https://github.com/itm4n/PrivescCheck/raw/master/PrivescCheck.ps1")
-Invoke-PrivescCheck -Report PrivescCheck_$env:computername -Format TXT,CSV,HTML,XML -Extended
-
-Write-Host '######################################' -BackgroundColor Black
-Write-Host '## Running WinPeas                  ##' -BackgroundColor Black
-Write-Host '######################################' -BackgroundColor Black
-Write-Host 'Running WinPeas and saving output' -ForegroundColor Black -BackgroundColor White
-# Get latest release
-$currentPath=(Get-Location).Path
-$url = "https://github.com/carlospolop/PEASS-ng/releases/latest/download/winPEASany_ofs.exe"
-wget $url -OutFile $currentPath/winPEASx64.exe
-./winPEASx64.exe log
-
-# One liner to download and execute winPEASany from memory in a PS shell
-$wp=[System.Reflection.Assembly]::Load([byte[]](Invoke-WebRequest "$url" -UseBasicParsing | Select-Object -ExpandProperty Content)); [winPEAS.Program]::Main("")
-
-
 Function Get-BadPrivilege
 {
 
