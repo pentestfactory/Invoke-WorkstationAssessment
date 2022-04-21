@@ -31,9 +31,10 @@ Write-Host '## Running WinPeas                  ##' -BackgroundColor Black
 Write-Host '######################################' -BackgroundColor Black
 Write-Host 'Running WinPeas and saving output' -ForegroundColor Black -BackgroundColor White
 # Get latest release
-$currentPath=(Get-Location).Path
+
 mkdir WinPEAS
 cd WinPEAS
+$currentPath=(Get-Location).Path
 $url = "https://github.com/carlospolop/PEASS-ng/releases/latest/download/winPEASany_ofs.exe"
 wget $url -OutFile $currentPath/winPEASx64.exe
 ./winPEASx64.exe log
