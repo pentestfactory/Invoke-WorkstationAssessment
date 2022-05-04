@@ -2997,7 +2997,7 @@ Write-Host '#################################' -BackgroundColor Black
 $path = ".\HardeningKitty"
 If(!(test-path $path))
 {
-    Invoke-WebRequest -Uri "https://github.com/strakuscrafter/HardeningKitty/archive/refs/heads/master.zip" -OutFile ".\HardeningKitty.zip"
+    Invoke-WebRequest -Uri "https://github.com/pentestfactory/HardeningKitty/archive/refs/heads/master.zip" -OutFile ".\HardeningKitty.zip"
     Expand-Archive -Path ".\HardeningKitty.zip"
 }
 
