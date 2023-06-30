@@ -13,3 +13,8 @@ Afterwards you can run the Excel
 ```
 
 If you do not have admin rights yet, use the Invoke-AWPEC.ps1 script. You have to bypass AMSI for PS and .NET as we rely on PowerSharpPack heavily!
+
+````
+# BYPASS AMSI PS AND .NET FIRST!
+iex(new-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/pentestfactory/Invoke-WorkstationAssessment/main/Invoke-AWPEC.ps1')
+````
