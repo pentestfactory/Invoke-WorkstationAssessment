@@ -11,3 +11,5 @@ Afterwards you can run the Excel
 ```
 . .\Import-PTFCsvToExcel.ps1
 ```
+
+If you do not have admin rights yet, use the Invoke-AWPEC.ps1 script. You have to bypass AMSI for PS and .NET as we rely on PowerSharpPack heavily!
