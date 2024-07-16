@@ -36,7 +36,7 @@ whoami /all > whoami.txt
 
 New-Item -ItemType Directory -Force -Path "PowerUp" | Out-Null; cd PowerUp
 Write-Host "[RUN] Executing PowerUp - be patient!" -ForegroundColor Yellow
-Invoke-PrivescAudit -ErrorAction SilentlyContinue -HTMLReport
+Invoke-AllChecks > powerup_results.txt
 cd ..
 
 #New-Item -ItemType Directory -Force -Path "SharpUp" | Out-Null; cd SharpUp
